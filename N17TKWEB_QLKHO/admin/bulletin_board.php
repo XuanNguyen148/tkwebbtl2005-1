@@ -113,6 +113,24 @@ $userId = $_SESSION['user_id'] ?? null;
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         }
 
+        .post-card.hidden-post {
+            opacity: 0.6;
+            border: 1px dashed #cbd5f5;
+        }
+
+        .post-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 6px;
+            background: #f1f5f9;
+            color: #64748b;
+        }
+
         .post-header {
             display: flex;
             justify-content: space-between;
@@ -221,6 +239,7 @@ $userId = $_SESSION['user_id'] ?? null;
             width: 100%;
             height: 100%;
             object-fit: cover;
+            cursor: pointer;
         }
 
         .attachment-item video {
@@ -790,6 +809,155 @@ $userId = $_SESSION['user_id'] ?? null;
             background: #f0f0f0;
         }
 
+        /* Post actions modal */
+        .post-action-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10001;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .post-action-modal.show {
+            display: flex;
+        }
+
+        .post-action-content {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            width: 90%;
+            max-width: 360px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .post-action-content h3 {
+            margin: 0 0 15px;
+            font-size: 18px;
+            color: var(--dark);
+        }
+
+        .post-action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .post-action-buttons button {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .post-action-buttons button:hover {
+            transform: translateY(-1px);
+        }
+
+        .post-action-toggle {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .post-action-delete {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .post-action-cancel {
+            background: #f1f5f9;
+            color: #334155;
+        }
+
+        /* Image modal */
+        .image-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            z-index: 10002;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .image-modal.show {
+            display: flex;
+        }
+
+        .image-modal-content {
+            position: relative;
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+
+        .image-modal-content img {
+            max-width: 90vw;
+            max-height: 90vh;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+
+        .image-modal-close {
+            position: absolute;
+            top: -15px;
+            right: -15px;
+            background: white;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Post detail modal */
+        .post-detail-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 10001;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .post-detail-modal.show {
+            display: flex;
+        }
+
+        .post-detail-content {
+            background: white;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 820px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .post-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .post-detail-header h3 {
+            margin: 0;
+            font-size: 20px;
+            color: var(--primary);
+        }
+
         /* Loading spinner */
         .loading {
             text-align: center;
@@ -1005,6 +1173,39 @@ $userId = $_SESSION['user_id'] ?? null;
                     </form>
                 </div>
             </div>
+
+            <!-- Post action modal -->
+            <div class="post-action-modal" id="postActionModal">
+                <div class="post-action-content">
+                    <h3>Tuỳ chọn bài đăng</h3>
+                    <div class="post-action-buttons">
+                        <button class="post-action-toggle" id="postActionToggleBtn" onclick="handlePostActionToggle()"></button>
+                        <button class="post-action-delete" onclick="handlePostActionDelete()">
+                            <i class="fas fa-trash"></i> Xóa bài đăng
+                        </button>
+                        <button class="post-action-cancel" onclick="closePostActionModal()">Hủy</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Post detail modal -->
+            <div class="post-detail-modal" id="postDetailModal">
+                <div class="post-detail-content">
+                    <div class="post-detail-header">
+                        <h3>Chi tiết bài đăng</h3>
+                        <button class="modal-close" onclick="closePostDetailModal()">&times;</button>
+                    </div>
+                    <div id="postDetailBody"></div>
+                </div>
+            </div>
+
+            <!-- Image modal -->
+            <div class="image-modal" id="imageModal">
+                <div class="image-modal-content">
+                    <button class="image-modal-close" onclick="closeImageModal()">&times;</button>
+                    <img id="imageModalImg" src="" alt="">
+                </div>
+            </div>
         </main>
     </div>
 
@@ -1015,6 +1216,8 @@ $userId = $_SESSION['user_id'] ?? null;
         let currentPage = 1;
         let selectedFiles = [];
         let notificationInterval = null;
+        let activePostActionId = null;
+        let activePostActionStatus = null;
 
         // ==================== INIT ====================
         document.addEventListener('DOMContentLoaded', function() {
@@ -1047,6 +1250,38 @@ $userId = $_SESSION['user_id'] ?? null;
             document.getElementById('createPostModal').addEventListener('click', function(e) {
                 if (e.target === this) {
                     closeCreatePostModal();
+                }
+            });
+
+            document.getElementById('postActionModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closePostActionModal();
+                }
+            });
+
+            document.getElementById('postDetailModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closePostDetailModal();
+                }
+            });
+
+            document.getElementById('imageModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeImageModal();
+                }
+            });
+
+            document.addEventListener('click', function(event) {
+                const dropdown = document.getElementById('notificationsDropdown');
+                const bell = document.querySelector('.notification-bell');
+                const settingsMenu = document.getElementById('notifSettingsMenu');
+
+                if (dropdown.classList.contains('show') && !bell.contains(event.target)) {
+                    dropdown.classList.remove('show');
+                }
+
+                if (settingsMenu.classList.contains('show') && !settingsMenu.contains(event.target)) {
+                    settingsMenu.classList.remove('show');
                 }
             });
         }
@@ -1144,7 +1379,9 @@ $userId = $_SESSION['user_id'] ?? null;
         // ==================== LOAD POSTS ====================
         async function loadPosts() {
             const container = document.getElementById('postsList');
+            const paginationContainer = document.getElementById('paginationContainer');
             container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Đang tải bài đăng...</p></div>';
+            paginationContainer.innerHTML = '';
             
             try {
                 const response = await fetch(`bulletin_api.php?action=get_posts&filter=${currentFilter}&page=${currentPage}`);
@@ -1177,8 +1414,10 @@ $userId = $_SESSION['user_id'] ?? null;
         // ==================== CREATE POST CARD ====================
         function createPostCard(post) {
             const card = document.createElement('div');
-            card.className = 'post-card';
+            const isHidden = post.TrangThai === 'Ẩn';
+            card.className = `post-card${isHidden ? ' hidden-post' : ''}`;
             card.dataset.postId = post.MaBD;
+            card.dataset.status = post.TrangThai;
             
             // Category class
             let categoryClass = 'category-forum';
@@ -1199,6 +1438,7 @@ $userId = $_SESSION['user_id'] ?? null;
                             <div class="author-name">${escapeHtml(post.TenNguoiDang)}</div>
                             <div class="post-time">${timeAgo}</div>
                             <span class="post-category ${categoryClass}">${post.PhanLoai}</span>
+                            ${isHidden ? '<span class="post-status-badge"><i class="fas fa-eye-slash"></i> Đang ẩn</span>' : ''}
                         </div>
                     </div>
                     ${post.CoTheChinhSua ? `
@@ -1214,7 +1454,7 @@ $userId = $_SESSION['user_id'] ?? null;
                     <div class="post-attachments">
                         ${post.FileDinhKem.map(file => {
                             if (file.type.startsWith('image/')) {
-                                return `<div class="attachment-item"><img src="../${file.path}" alt="${file.name}"></div>`;
+                                return `<div class="attachment-item"><img src="../${file.path}" alt="${escapeHtml(file.name)}" onclick="openImageModal('../${file.path}', '${escapeHtml(file.name)}')"></div>`;
                             } else if (file.type.startsWith('video/')) {
                                 return `<div class="attachment-item"><video src="../${file.path}" controls></video></div>`;
                             } else {
@@ -1278,13 +1518,13 @@ $userId = $_SESSION['user_id'] ?? null;
             }
         }
 
-        async function loadComments(maBD) {
+        async function loadComments(maBD, rootElement = document) {
             try {
                 const response = await fetch(`bulletin_api.php?action=get_post_detail&maBD=${maBD}`);
                 const result = await response.json();
                 
                 if (result.success) {
-                    const commentsList = document.querySelector(`#comments-${maBD} .comments-list`);
+                    const commentsList = rootElement.querySelector(`#comments-${maBD} .comments-list`);
                     commentsList.innerHTML = '';
                     
                     result.comments.forEach(comment => {
@@ -1349,7 +1589,8 @@ $userId = $_SESSION['user_id'] ?? null;
                 
                 if (result.success) {
                     inputElement.value = '';
-                    await loadComments(maBD);
+                    const rootCard = inputElement.closest('.post-card') || document;
+                    await loadComments(maBD, rootCard);
                     await loadPosts(); // Reload to update comment count
                 } else {
                     alert('Lỗi: ' + result.message);
@@ -1435,12 +1676,38 @@ $userId = $_SESSION['user_id'] ?? null;
         // ==================== POST MENU ====================
         function showPostMenu(maBD, event) {
             event.stopPropagation();
-            
-            if (confirm('Bạn muốn:\n1. Ẩn/Hiện bài đăng\n2. Xóa bài đăng\n\nNhấn OK để Ẩn/Hiện, Cancel để Xóa')) {
-                togglePostVisibility(maBD);
-            } else {
-                deletePost(maBD);
-            }
+            const card = document.querySelector(`[data-post-id="${maBD}"]`);
+            activePostActionId = maBD;
+            activePostActionStatus = card ? card.dataset.status : 'Hiển thị';
+
+            const toggleBtn = document.getElementById('postActionToggleBtn');
+            toggleBtn.innerHTML = activePostActionStatus === 'Ẩn'
+                ? '<i class="fas fa-eye"></i> Hiện bài đăng'
+                : '<i class="fas fa-eye-slash"></i> Ẩn bài đăng';
+
+            openPostActionModal();
+        }
+
+        function openPostActionModal() {
+            document.getElementById('postActionModal').classList.add('show');
+        }
+
+        function closePostActionModal() {
+            document.getElementById('postActionModal').classList.remove('show');
+            activePostActionId = null;
+            activePostActionStatus = null;
+        }
+
+        async function handlePostActionToggle() {
+            if (!activePostActionId) return;
+            await togglePostVisibility(activePostActionId);
+            closePostActionModal();
+        }
+
+        async function handlePostActionDelete() {
+            if (!activePostActionId) return;
+            await deletePost(activePostActionId);
+            closePostActionModal();
         }
 
         async function togglePostVisibility(maBD) {
@@ -1464,4 +1731,237 @@ $userId = $_SESSION['user_id'] ?? null;
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Có lỗi x
+                alert('Có lỗi xảy ra khi cập nhật bài đăng');
+            }
+        }
+
+        async function deletePost(maBD) {
+            const formData = new FormData();
+            formData.append('action', 'delete_post');
+            formData.append('maBD', maBD);
+
+            try {
+                const response = await fetch('bulletin_api.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Đã xóa bài đăng');
+                    await loadPosts();
+                } else {
+                    alert('Lỗi: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Có lỗi xảy ra khi xóa bài đăng');
+            }
+        }
+
+        // ==================== POST DETAIL ====================
+        async function openPostDetail(maBD) {
+            try {
+                const response = await fetch(`bulletin_api.php?action=get_post_detail&maBD=${maBD}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const container = document.getElementById('postDetailBody');
+                    container.innerHTML = '';
+                    const card = createPostCard(result.post);
+                    container.appendChild(card);
+
+                    const commentsSection = card.querySelector(`#comments-${maBD}`);
+                    if (commentsSection) {
+                        commentsSection.style.display = 'block';
+                        await loadComments(maBD, card);
+                    }
+
+                    document.getElementById('postDetailModal').classList.add('show');
+                } else {
+                    alert('Lỗi: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Không thể tải chi tiết bài đăng');
+            }
+        }
+
+        function closePostDetailModal() {
+            document.getElementById('postDetailModal').classList.remove('show');
+            document.getElementById('postDetailBody').innerHTML = '';
+        }
+
+        // ==================== IMAGE MODAL ====================
+        function openImageModal(src, altText) {
+            const modal = document.getElementById('imageModal');
+            const img = document.getElementById('imageModalImg');
+            img.src = src;
+            img.alt = altText || '';
+            modal.classList.add('show');
+        }
+
+        function closeImageModal() {
+            const modal = document.getElementById('imageModal');
+            const img = document.getElementById('imageModalImg');
+            img.src = '';
+            img.alt = '';
+            modal.classList.remove('show');
+        }
+
+        // ==================== NOTIFICATIONS ====================
+        async function loadNotifications() {
+            try {
+                const response = await fetch('bulletin_api.php?action=get_notifications');
+                const result = await response.json();
+
+                if (result.success) {
+                    const list = document.getElementById('notifList');
+                    list.innerHTML = '';
+
+                    if (!result.notifications.length) {
+                        list.innerHTML = '<div class="notif-empty">Không có thông báo</div>';
+                    } else {
+                        result.notifications.forEach(notif => {
+                            const item = document.createElement('div');
+                            item.className = `notif-item ${notif.DaDoc == 0 ? 'unread' : ''}`;
+                            item.innerHTML = `
+                                <div class="notif-content">${renderNotificationText(notif)}</div>
+                                <div class="notif-time">${getTimeAgo(notif.ThoiGian)}</div>
+                            `;
+                            item.addEventListener('click', () => handleNotificationClick(notif));
+                            list.appendChild(item);
+                        });
+                    }
+
+                    const badge = document.getElementById('notifBadge');
+                    if (result.unreadCount > 0) {
+                        badge.style.display = 'flex';
+                        badge.textContent = result.unreadCount;
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function renderNotificationText(notif) {
+            switch (notif.LoaiThongBao) {
+                case 'BinhLuanBaiCuaBan':
+                    return `<strong>${escapeHtml(notif.TenNguoiTacDong || '')}</strong> đã bình luận bài viết của bạn: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
+                case 'BinhLuanBaiTheoDoi':
+                    return `<strong>${escapeHtml(notif.TenNguoiTacDong || '')}</strong> đã bình luận bài bạn theo dõi: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
+                case 'BaiHot':
+                    return `Bài viết đang hot: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
+                default:
+                    return escapeHtml(notif.NoiDungRutGon || 'Bạn có thông báo mới');
+            }
+        }
+
+        async function handleNotificationClick(notif) {
+            if (notif.MaTB) {
+                const formData = new FormData();
+                formData.append('action', 'mark_notification_read');
+                formData.append('maTB', notif.MaTB);
+                await fetch('bulletin_api.php', { method: 'POST', body: formData });
+            }
+
+            if (notif.MaBD) {
+                await openPostDetail(notif.MaBD);
+            }
+
+            document.getElementById('notificationsDropdown').classList.remove('show');
+            await loadNotifications();
+        }
+
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notificationsDropdown');
+            dropdown.classList.toggle('show');
+            if (dropdown.classList.contains('show')) {
+                loadNotifications();
+            }
+        }
+
+        function toggleNotifSettings(event) {
+            event.stopPropagation();
+            document.getElementById('notifSettingsMenu').classList.toggle('show');
+        }
+
+        async function markAllAsRead() {
+            const formData = new FormData();
+            formData.append('action', 'mark_all_read');
+
+            await fetch('bulletin_api.php', { method: 'POST', body: formData });
+            await loadNotifications();
+        }
+
+        async function deleteAllNotifications() {
+            if (!confirm('Bạn có chắc chắn muốn xóa tất cả thông báo?')) return;
+            const formData = new FormData();
+            formData.append('action', 'delete_all_notifications');
+
+            await fetch('bulletin_api.php', { method: 'POST', body: formData });
+            await loadNotifications();
+        }
+
+        function startNotificationPolling() {
+            if (notificationInterval) clearInterval(notificationInterval);
+            notificationInterval = setInterval(loadNotifications, 30000);
+        }
+
+        // ==================== PAGINATION ====================
+        function displayPagination(current, totalPages) {
+            const container = document.getElementById('paginationContainer');
+            container.innerHTML = '';
+
+            const pagination = document.createElement('div');
+            pagination.className = 'pagination';
+
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.className = `tab-btn ${i === current ? 'active' : ''}`;
+                btn.textContent = i;
+                btn.onclick = () => changePage(i);
+                pagination.appendChild(btn);
+            }
+
+            container.appendChild(pagination);
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            loadPosts();
+        }
+
+        // ==================== UTILITIES ====================
+        function getTimeAgo(timestamp) {
+            const now = new Date();
+            const time = new Date(timestamp);
+            const diffSeconds = Math.floor((now - time) / 1000);
+
+            if (diffSeconds < 60) return 'Vừa xong';
+            const diffMinutes = Math.floor(diffSeconds / 60);
+            if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+            const diffHours = Math.floor(diffMinutes / 60);
+            if (diffHours < 24) return `${diffHours} giờ trước`;
+            const diffDays = Math.floor(diffHours / 24);
+            if (diffDays < 7) return `${diffDays} ngày trước`;
+
+            return time.toLocaleDateString('vi-VN');
+        }
+
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>
