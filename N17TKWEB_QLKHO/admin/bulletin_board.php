@@ -109,6 +109,15 @@ $userId = $_SESSION['user_id'] ?? null;
             transition: all 0.3s ease;
         }
 
+        .post-card.post-hidden {
+            opacity: 0.55;
+            filter: grayscale(0.2);
+        }
+
+        .post-card.highlight {
+            box-shadow: 0 0 0 3px rgba(248, 108, 107, 0.4);
+        }
+
         .post-card:hover {
             box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         }
@@ -420,6 +429,75 @@ $userId = $_SESSION['user_id'] ?? null;
 
         .create-post-modal.show {
             display: flex;
+        }
+
+        .post-action-modal,
+        .post-detail-modal,
+        .image-viewer-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 11000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .post-action-modal.show,
+        .post-detail-modal.show,
+        .image-viewer-modal.show {
+            display: flex;
+        }
+
+        .post-action-content,
+        .post-detail-content {
+            background: white;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 520px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .post-action-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .post-action-buttons button {
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-secondary {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .btn-warning {
+            background: #f6c343;
+            color: #222;
+        }
+
+        .btn-danger {
+            background: #f86c6b;
+            color: #fff;
+        }
+
+        .post-detail-body {
+            margin-top: 10px;
+        }
+
+        .image-viewer-content img {
+            max-width: 90vw;
+            max-height: 90vh;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
         }
 
         .modal-content {
@@ -1005,6 +1083,37 @@ $userId = $_SESSION['user_id'] ?? null;
                     </form>
                 </div>
             </div>
+
+            <div class="post-action-modal" id="postActionModal">
+                <div class="post-action-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Tùy chọn bài đăng</h2>
+                        <button class="modal-close" onclick="closePostActionModal()">&times;</button>
+                    </div>
+                    <p>Bạn muốn thực hiện thao tác nào với bài đăng này?</p>
+                    <div class="post-action-buttons">
+                        <button class="btn-secondary" onclick="closePostActionModal()">Quay lại</button>
+                        <button class="btn-warning" onclick="handlePostVisibilityAction()">Ẩn/Hiện</button>
+                        <button class="btn-danger" onclick="handlePostDeleteAction()">Xóa</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="post-detail-modal" id="postDetailModal">
+                <div class="post-detail-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Bài viết</h2>
+                        <button class="modal-close" onclick="closePostDetailModal()">&times;</button>
+                    </div>
+                    <div class="post-detail-body" id="postDetailBody"></div>
+                </div>
+            </div>
+
+            <div class="image-viewer-modal" id="imageViewerModal">
+                <div class="image-viewer-content">
+                    <img id="imageViewerImg" src="" alt="Ảnh bài đăng">
+                </div>
+            </div>
         </main>
     </div>
 
@@ -1047,6 +1156,24 @@ $userId = $_SESSION['user_id'] ?? null;
             document.getElementById('createPostModal').addEventListener('click', function(e) {
                 if (e.target === this) {
                     closeCreatePostModal();
+                }
+            });
+
+            document.getElementById('postActionModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closePostActionModal();
+                }
+            });
+
+            document.getElementById('postDetailModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closePostDetailModal();
+                }
+            });
+
+            document.getElementById('imageViewerModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeImageViewer();
                 }
             });
         }
@@ -1144,6 +1271,7 @@ $userId = $_SESSION['user_id'] ?? null;
         // ==================== LOAD POSTS ====================
         async function loadPosts() {
             const container = document.getElementById('postsList');
+            document.getElementById('paginationContainer').innerHTML = '';
             container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Đang tải bài đăng...</p></div>';
             
             try {
@@ -1177,7 +1305,8 @@ $userId = $_SESSION['user_id'] ?? null;
         // ==================== CREATE POST CARD ====================
         function createPostCard(post) {
             const card = document.createElement('div');
-            card.className = 'post-card';
+            const isHidden = post.TrangThai === 'Ẩn';
+            card.className = `post-card${isHidden ? ' post-hidden' : ''}`;
             card.dataset.postId = post.MaBD;
             
             // Category class
@@ -1199,6 +1328,7 @@ $userId = $_SESSION['user_id'] ?? null;
                             <div class="author-name">${escapeHtml(post.TenNguoiDang)}</div>
                             <div class="post-time">${timeAgo}</div>
                             <span class="post-category ${categoryClass}">${post.PhanLoai}</span>
+                            ${isHidden ? `<span class="post-category" style="background:#9ca3af;">Đã ẩn</span>` : ''}
                         </div>
                     </div>
                     ${post.CoTheChinhSua ? `
@@ -1214,7 +1344,7 @@ $userId = $_SESSION['user_id'] ?? null;
                     <div class="post-attachments">
                         ${post.FileDinhKem.map(file => {
                             if (file.type.startsWith('image/')) {
-                                return `<div class="attachment-item"><img src="../${file.path}" alt="${file.name}"></div>`;
+                                return `<div class="attachment-item"><img src="../${file.path}" alt="${escapeHtml(file.name)}" onclick="openImageViewer('../${file.path}')"></div>`;
                             } else if (file.type.startsWith('video/')) {
                                 return `<div class="attachment-item"><video src="../${file.path}" controls></video></div>`;
                             } else {
@@ -1435,12 +1565,33 @@ $userId = $_SESSION['user_id'] ?? null;
         // ==================== POST MENU ====================
         function showPostMenu(maBD, event) {
             event.stopPropagation();
-            
-            if (confirm('Bạn muốn:\n1. Ẩn/Hiện bài đăng\n2. Xóa bài đăng\n\nNhấn OK để Ẩn/Hiện, Cancel để Xóa')) {
-                togglePostVisibility(maBD);
-            } else {
-                deletePost(maBD);
-            }
+            openPostActionModal(maBD);
+        }
+
+        let pendingPostId = null;
+
+        function openPostActionModal(maBD) {
+            pendingPostId = maBD;
+            document.getElementById('postActionModal').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closePostActionModal() {
+            pendingPostId = null;
+            document.getElementById('postActionModal').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        function handlePostVisibilityAction() {
+            if (!pendingPostId) return;
+            togglePostVisibility(pendingPostId);
+            closePostActionModal();
+        }
+
+        function handlePostDeleteAction() {
+            if (!pendingPostId) return;
+            deletePost(pendingPostId);
+            closePostActionModal();
         }
 
         async function togglePostVisibility(maBD) {
@@ -1464,4 +1615,316 @@ $userId = $_SESSION['user_id'] ?? null;
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Có lỗi x
+                alert('Có lỗi xảy ra khi cập nhật trạng thái bài đăng');
+            }
+        }
+
+        async function deletePost(maBD) {
+            if (!confirm('Bạn có chắc chắn muốn xóa bài đăng này?')) return;
+
+            const formData = new FormData();
+            formData.append('action', 'delete_post');
+            formData.append('maBD', maBD);
+
+            try {
+                const response = await fetch('bulletin_api.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Đã xóa bài đăng');
+                    await loadPosts();
+                } else {
+                    alert('Lỗi: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Có lỗi xảy ra khi xóa bài đăng');
+            }
+        }
+
+        // ==================== NOTIFICATIONS ====================
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notificationsDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        function toggleNotifSettings(event) {
+            event.stopPropagation();
+            document.getElementById('notifSettingsMenu').classList.toggle('show');
+        }
+
+        async function loadNotifications() {
+            const list = document.getElementById('notifList');
+            try {
+                const response = await fetch('bulletin_api.php?action=get_notifications');
+                const result = await response.json();
+
+                if (!result.success) {
+                    list.innerHTML = '<div class="notif-empty">Không thể tải thông báo</div>';
+                    return;
+                }
+
+                const { notifications, unreadCount } = result;
+                const badge = document.getElementById('notifBadge');
+                if (unreadCount > 0) {
+                    badge.style.display = 'inline-block';
+                    badge.textContent = unreadCount;
+                } else {
+                    badge.style.display = 'none';
+                }
+
+                if (!notifications || notifications.length === 0) {
+                    list.innerHTML = '<div class="notif-empty">Không có thông báo mới</div>';
+                    return;
+                }
+
+                list.innerHTML = '';
+                notifications.forEach(notif => {
+                    const item = document.createElement('div');
+                    item.className = `notif-item ${notif.DaDoc == 0 ? 'unread' : ''}`;
+                    item.innerHTML = `
+                        <div class="notif-content">${renderNotificationContent(notif)}</div>
+                        <div class="notif-time">${getTimeAgo(notif.ThoiGian)}</div>
+                    `;
+                    item.addEventListener('click', () => handleNotificationClick(notif));
+                    list.appendChild(item);
+                });
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+                list.innerHTML = '<div class="notif-empty">Có lỗi khi tải thông báo</div>';
+            }
+        }
+
+        function renderNotificationContent(notif) {
+            const noiDung = escapeHtml(notif.NoiDungRutGon || notif.NoiDungBaiDang || '');
+            switch (notif.LoaiThongBao) {
+                case 'BinhLuanBaiCuaBan':
+                    return `<strong>${escapeHtml(notif.TenNguoiTacDong || 'Ai đó')}</strong> đã bình luận: "${noiDung}"`;
+                case 'BinhLuanBaiTheoDoi':
+                    return `<strong>${escapeHtml(notif.TenNguoiTacDong || 'Ai đó')}</strong> bình luận bài bạn theo dõi: "${noiDung}"`;
+                case 'BaiHot':
+                    return `Bài viết đang được quan tâm: "${noiDung}"`;
+                default:
+                    return `${noiDung}`;
+            }
+        }
+
+        async function handleNotificationClick(notif) {
+            if (notif.MaTB) {
+                await markNotificationRead(notif.MaTB);
+            }
+            document.getElementById('notificationsDropdown').classList.remove('show');
+            if (notif.MaBD) {
+                await navigateToPost(notif.MaBD);
+            }
+        }
+
+        async function markNotificationRead(maTB) {
+            const formData = new FormData();
+            formData.append('action', 'mark_notification_read');
+            formData.append('maTB', maTB);
+
+            try {
+                await fetch('bulletin_api.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                await loadNotifications();
+            } catch (error) {
+                console.error('Error marking notification read:', error);
+            }
+        }
+
+        async function markAllAsRead() {
+            const formData = new FormData();
+            formData.append('action', 'mark_all_read');
+
+            try {
+                const response = await fetch('bulletin_api.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.success) {
+                    await loadNotifications();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function deleteAllNotifications() {
+            if (!confirm('Bạn có chắc chắn muốn xóa tất cả thông báo?')) return;
+
+            const formData = new FormData();
+            formData.append('action', 'delete_all_notifications');
+
+            try {
+                const response = await fetch('bulletin_api.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.success) {
+                    await loadNotifications();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function startNotificationPolling() {
+            if (notificationInterval) {
+                clearInterval(notificationInterval);
+            }
+            notificationInterval = setInterval(loadNotifications, 30000);
+        }
+
+        // ==================== POST DETAIL MODAL ====================
+        async function navigateToPost(maBD) {
+            updateActiveTab('all');
+            currentFilter = 'all';
+            currentPage = 1;
+            await loadPosts();
+
+            const card = document.querySelector(`.post-card[data-post-id="${maBD}"]`);
+            if (card) {
+                card.classList.add('highlight');
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => card.classList.remove('highlight'), 2000);
+                return;
+            }
+
+            await openPostDetailModal(maBD);
+        }
+
+        async function openPostDetailModal(maBD) {
+            const body = document.getElementById('postDetailBody');
+            body.innerHTML = '<div class="loading"><div class="spinner"></div><p>Đang tải bài viết...</p></div>';
+            document.getElementById('postDetailModal').classList.add('show');
+            document.body.style.overflow = 'hidden';
+
+            try {
+                const response = await fetch(`bulletin_api.php?action=get_post_detail&maBD=${maBD}`);
+                const result = await response.json();
+                if (!result.success) {
+                    body.innerHTML = `<div class="notif-empty">${escapeHtml(result.message)}</div>`;
+                    return;
+                }
+
+                const post = result.post;
+                const timeAgo = getTimeAgo(post.ThoiGianDang);
+                body.innerHTML = `
+                    <div class="post-header">
+                        <div class="post-author">
+                            <div class="author-avatar">${post.TenNguoiDang.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}</div>
+                            <div class="author-info">
+                                <div class="author-name">${escapeHtml(post.TenNguoiDang)}</div>
+                                <div class="post-time">${timeAgo}</div>
+                                <span class="post-category">${escapeHtml(post.PhanLoai)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="post-content">${escapeHtml(post.NoiDung)}</div>
+                    ${renderAttachments(post.FileDinhKem)}
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                body.innerHTML = '<div class="notif-empty">Có lỗi khi tải bài viết</div>';
+            }
+        }
+
+        function closePostDetailModal() {
+            document.getElementById('postDetailModal').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        function renderAttachments(files) {
+            if (!files || files.length === 0) return '';
+            return `
+                <div class="post-attachments">
+                    ${files.map(file => {
+                        if (file.type.startsWith('image/')) {
+                            return `<div class="attachment-item"><img src="../${file.path}" alt="${escapeHtml(file.name)}" onclick="openImageViewer('../${file.path}')"></div>`;
+                        } else if (file.type.startsWith('video/')) {
+                            return `<div class="attachment-item"><video src="../${file.path}" controls></video></div>`;
+                        } else {
+                            return `<a href="../${file.path}" class="attachment-file" target="_blank">
+                                <i class="fas fa-file-alt"></i>
+                                <span>${escapeHtml(file.name)}</span>
+                            </a>`;
+                        }
+                    }).join('')}
+                </div>
+            `;
+        }
+
+        // ==================== IMAGE VIEWER ====================
+        function openImageViewer(src) {
+            const img = document.getElementById('imageViewerImg');
+            img.src = src;
+            document.getElementById('imageViewerModal').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeImageViewer() {
+            document.getElementById('imageViewerModal').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        // ==================== PAGINATION ====================
+        function displayPagination(current, total) {
+            const container = document.getElementById('paginationContainer');
+            container.innerHTML = '';
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pagination';
+
+            for (let i = 1; i <= total; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                btn.className = `page-btn ${i === current ? 'active' : ''}`;
+                btn.addEventListener('click', () => {
+                    currentPage = i;
+                    loadPosts();
+                });
+                wrapper.appendChild(btn);
+            }
+
+            container.appendChild(wrapper);
+        }
+
+        function updateActiveTab(filter) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.filter === filter);
+            });
+        }
+
+        // ==================== UTILS ====================
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text ?? '';
+            return div.innerHTML;
+        }
+
+        function getTimeAgo(time) {
+            const now = new Date();
+            const past = new Date(time);
+            const diff = Math.floor((now - past) / 1000);
+
+            if (diff < 60) return 'Vừa xong';
+            const minutes = Math.floor(diff / 60);
+            if (minutes < 60) return `${minutes} phút trước`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours} giờ trước`;
+            const days = Math.floor(hours / 24);
+            if (days < 7) return `${days} ngày trước`;
+            return past.toLocaleDateString('vi-VN');
+        }
+    </script>
+</body>
+</html>
