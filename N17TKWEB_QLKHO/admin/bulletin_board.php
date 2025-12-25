@@ -36,6 +36,21 @@ $userId = $_SESSION['user_id'] ?? null;
             margin-bottom: 25px;
             flex-wrap: wrap;
             gap: 15px;
+            position: sticky;
+            top: 90px;
+            z-index: 50;
+            padding: 12px 0;
+            background: var(--secondary);
+        }
+
+        .bulletin-header::after {
+            content: '';
+            position: absolute;
+            left: -30px;
+            right: -30px;
+            bottom: 0;
+            height: 1px;
+            background: rgba(148, 163, 184, 0.3);
         }
 
         .create-post-btn {
@@ -1033,10 +1048,36 @@ $userId = $_SESSION['user_id'] ?? null;
         .report-content {
             background: white;
             padding: 24px;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 420px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            width: 92%;
+            max-width: 460px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .report-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .report-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .report-title i {
+            color: var(--warning);
+        }
+
+        .report-subtitle {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-bottom: 15px;
         }
 
         .report-options {
@@ -1049,15 +1090,26 @@ $userId = $_SESSION['user_id'] ?? null;
         .report-option-btn {
             border: 1px solid #e2e8f0;
             background: #f8fafc;
-            padding: 10px 12px;
-            border-radius: 8px;
+            padding: 12px 14px;
+            border-radius: 12px;
             cursor: pointer;
             text-align: left;
+            font-weight: 600;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .report-option-btn:hover {
             border-color: var(--primary);
             background: #eef4ff;
+        }
+
+        .report-footer {
+            margin-top: 18px;
+            display: flex;
+            justify-content: flex-end;
         }
 
         /* Loading spinner */
@@ -1140,7 +1192,13 @@ $userId = $_SESSION['user_id'] ?? null;
                 <div class="user-name"><?php echo htmlspecialchars($userName); ?></div>
                 <div class="user-role"><?php echo htmlspecialchars($userRole); ?></div>
             </div>
-            <div class="user-avatar"> <i class="fas fa-user"></i> </div>
+            <?php
+            $nameParts = preg_split('/\s+/', trim($userName));
+            $firstInitial = $nameParts[0][0] ?? '';
+            $lastInitial = count($nameParts) > 1 ? $nameParts[count($nameParts) - 1][0] : '';
+            $headerInitials = strtoupper($firstInitial . $lastInitial);
+            ?>
+            <div class="user-avatar"><?php echo htmlspecialchars($headerInitials ?: 'U'); ?></div>
         </div>
     </header>
 
@@ -1197,20 +1255,20 @@ $userId = $_SESSION['user_id'] ?? null;
             <div class="bulletin-container">
                 <!-- Header với nút đăng bài và tabs -->
                 <div class="bulletin-header">
-                    <button class="create-post-btn" onclick="openCreatePostModal()">
+                    <button class="create-post-btn" type="button" onclick="openCreatePostModal()">
                         <i class="fas fa-plus-circle"></i>
                         <span>Đăng bài</span>
                     </button>
                     
                     <div class="bulletin-tabs">
-                        <button class="tab-btn active" data-filter="all">Tất cả</button>
-                        <button class="tab-btn" data-filter="hot">
+                        <button class="tab-btn active" type="button" data-filter="all">Tất cả</button>
+                        <button class="tab-btn" type="button" data-filter="hot">
                             <i class="fas fa-fire"></i> Bài Hot
                         </button>
-                        <button class="tab-btn" data-filter="mine">Bài viết của tôi</button>
-                        <button class="tab-btn" data-filter="company">Bảng tin công ty</button>
-                        <button class="tab-btn" data-filter="forum">Diễn đàn nhân viên</button>
-                        <button class="tab-btn" data-filter="qa">Góc hỏi đáp</button>
+                        <button class="tab-btn" type="button" data-filter="mine">Bài viết của tôi</button>
+                        <button class="tab-btn" type="button" data-filter="company">Bảng tin công ty</button>
+                        <button class="tab-btn" type="button" data-filter="forum">Diễn đàn nhân viên</button>
+                        <button class="tab-btn" type="button" data-filter="qa">Góc hỏi đáp</button>
                     </div>
                 </div>
 
@@ -1294,17 +1352,17 @@ $userId = $_SESSION['user_id'] ?? null;
                 <div class="post-action-content">
                     <h3>Tuỳ chọn bài đăng</h3>
                     <div class="post-action-buttons">
-                        <button class="post-action-toggle" id="postActionToggleBtn" onclick="handlePostActionToggle()"></button>
-                        <button class="post-action-report" id="postActionReportBtn" onclick="openReportModal()">
+                        <button class="post-action-toggle" type="button" id="postActionToggleBtn" onclick="handlePostActionToggle()"></button>
+                        <button class="post-action-report" type="button" id="postActionReportBtn" onclick="openReportModal()">
                             <i class="fas fa-flag"></i> Báo cáo với quản trị viên
                         </button>
-                        <button class="post-action-delete" onclick="handlePostActionDelete()">
+                        <button class="post-action-delete" type="button" onclick="handlePostActionDelete()">
                             <i class="fas fa-trash"></i> Xóa bài đăng
                         </button>
-                        <button class="post-action-delete" id="postActionDeleteReportBtn" onclick="handleDeleteReport()">
+                        <button class="post-action-delete" type="button" id="postActionDeleteReportBtn" onclick="handleDeleteReport()">
                             <i class="fas fa-file-circle-xmark"></i> Xóa báo cáo
                         </button>
-                        <button class="post-action-cancel" onclick="closePostActionModal()">Hủy</button>
+                        <button class="post-action-cancel" type="button" onclick="closePostActionModal()">Hủy</button>
                     </div>
                 </div>
             </div>
@@ -1330,16 +1388,26 @@ $userId = $_SESSION['user_id'] ?? null;
 
             <div class="report-modal" id="reportModal">
                 <div class="report-content">
-                    <h3>Báo cáo bài đăng</h3>
-                    <p>Vui lòng chọn lý do báo cáo:</p>
+                    <div class="report-header">
+                        <div class="report-title">
+                            <i class="fas fa-flag"></i>
+                            <span>Báo cáo bài đăng</span>
+                        </div>
+                        <button class="modal-close" type="button" onclick="closeReportModal()">&times;</button>
+                    </div>
+                    <p class="report-subtitle">Hãy chọn lý do phù hợp để chúng tôi xử lý nhanh hơn.</p>
                     <div class="report-options">
-                        <button class="report-option-btn" onclick="submitReport('Bài đăng không phù hợp')">
+                        <button class="report-option-btn" type="button" onclick="submitReport('Bài đăng không phù hợp')">
+                            <i class="fas fa-triangle-exclamation"></i>
                             Bài đăng không phù hợp
                         </button>
-                        <button class="report-option-btn" onclick="submitReport('Nội dung có tính kích động')">
+                        <button class="report-option-btn" type="button" onclick="submitReport('Nội dung có tính kích động')">
+                            <i class="fas fa-bolt"></i>
                             Nội dung có tính kích động
                         </button>
-                        <button class="post-action-cancel" onclick="closeReportModal()">Hủy</button>
+                    </div>
+                    <div class="report-footer">
+                        <button class="post-action-cancel" type="button" onclick="closeReportModal()">Hủy</button>
                     </div>
                 </div>
             </div>
@@ -1594,7 +1662,7 @@ $userId = $_SESSION['user_id'] ?? null;
             if (post.PhanLoai === 'Góc hỏi đáp') categoryClass = 'category-qa';
             
             // Author initials
-            const initials = post.TenNguoiDang.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            const initials = getInitials(post.TenNguoiDang);
             const showManagerBadge = post.VaiTro === 'Quản lý' && post.DanhTinh !== 'Ẩn danh';
             const managerBadge = showManagerBadge ? '<span class="role-badge">QL</span>' : '';
             
@@ -1619,14 +1687,14 @@ $userId = $_SESSION['user_id'] ?? null;
                             ${isHidden ? '<span class="post-status-badge"><i class="fas fa-eye-slash"></i> Đang ẩn</span>' : ''}
                         </div>
                     </div>
-                    <button class="post-menu-btn" onclick="showPostMenu(${post.MaBD}, event, '${menuMode}', ${post.CoTheChinhSua})">
+                    <button class="post-menu-btn" type="button" onclick="showPostMenu(${post.MaBD}, event, '${menuMode}', ${post.CoTheChinhSua})">
                         <i class="fas fa-ellipsis-v"></i>
                     </button>
                 </div>
                 
                 <div class="post-content ${shouldTruncate ? 'truncated' : ''}" data-post-id="${post.MaBD}" data-short-content="${escapeHtmlAttribute(shortContent)}" data-full-content="${escapeHtmlAttribute(fullContent)}" data-expanded="${shouldTruncate ? 'false' : 'true'}">${shouldTruncate ? shortContent : fullContent}</div>
                 ${allowTruncate && hasLongContent ? `
-                    <button class="post-read-more" data-read-more="${post.MaBD}" onclick="togglePostContent(${post.MaBD})">${shouldTruncate ? 'Xem thêm' : 'Thu gọn'}</button>
+                    <button class="post-read-more" type="button" data-read-more="${post.MaBD}" onclick="togglePostContent(${post.MaBD})">${shouldTruncate ? 'Xem thêm' : 'Thu gọn'}</button>
                 ` : ''}
                 
                 ${post.FileDinhKem && post.FileDinhKem.length > 0 ? `
@@ -1653,26 +1721,26 @@ $userId = $_SESSION['user_id'] ?? null;
                 
                 ${allowActions ? `
                     <div class="post-actions">
-                        <button class="action-btn ${post.DaThichBD ? 'active' : ''}" data-post-like-btn="${post.MaBD}" onclick="toggleReaction('BaiDang', ${post.MaBD})">
+                        <button class="action-btn ${post.DaThichBD ? 'active' : ''}" type="button" data-post-like-btn="${post.MaBD}" onclick="toggleReaction('BaiDang', ${post.MaBD})">
                             <i class="fas fa-heart"></i>
                             <span>Thích</span>
                         </button>
-                        <button class="action-btn" onclick="toggleComments(${post.MaBD})">
+                        <button class="action-btn" type="button" onclick="toggleComments(${post.MaBD})">
                             <i class="fas fa-comment"></i>
                             <span>Bình luận</span>
                         </button>
-                        <button class="action-btn">
+                        <button class="action-btn" type="button">
                             <i class="fas fa-share"></i>
                             <span>Chia sẻ</span>
                         </button>
-                        <button class="action-btn ${post.DangTheoDoi ? 'active' : ''}" onclick="toggleFollow(${post.MaBD})">
+                        <button class="action-btn ${post.DangTheoDoi ? 'active' : ''}" type="button" onclick="toggleFollow(${post.MaBD})">
                             <i class="fas fa-bell"></i>
                             <span>Theo dõi</span>
                         </button>
                     </div>
                 ` : `
                     <div class="post-actions">
-                        <button class="action-btn" onclick="toggleComments(${post.MaBD})">
+                        <button class="action-btn" type="button" onclick="toggleComments(${post.MaBD})">
                             <i class="fas fa-comment"></i>
                             <span>Bình luận</span>
                         </button>
@@ -1683,8 +1751,8 @@ $userId = $_SESSION['user_id'] ?? null;
                     <div class="comments-list"></div>
                     <div class="comment-input-wrapper">
                         <input type="text" class="comment-input" placeholder="Viết bình luận..." 
-                               onkeypress="if(event.key==='Enter') submitComment(${post.MaBD}, this.value, this)">
-                        <button class="comment-submit-btn" onclick="submitComment(${post.MaBD}, this.previousElementSibling.value, this.previousElementSibling)">
+                               onkeydown="if(event.key==='Enter'){ event.preventDefault(); submitComment(${post.MaBD}, this.value, this); }">
+                        <button class="comment-submit-btn" type="button" onclick="submitComment(${post.MaBD}, this.previousElementSibling.value, this.previousElementSibling)">
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
@@ -1733,7 +1801,7 @@ $userId = $_SESSION['user_id'] ?? null;
             const item = document.createElement('div');
             item.className = 'comment-item';
             
-            const initials = comment.TenNguoiBinhLuan.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            const initials = getInitials(comment.TenNguoiBinhLuan);
             const timeAgo = getTimeAgo(comment.ThoiGianBinhLuan);
             const managerBadge = comment.VaiTro === 'Quản lý' ? '<span class="role-badge">QL</span>' : '';
             
@@ -1898,9 +1966,11 @@ $userId = $_SESSION['user_id'] ?? null;
             if (activePostActionMode === 'report') {
                 reportBtn.style.display = 'none';
                 deleteReportBtn.style.display = 'inline-flex';
+                deleteReportBtn.dataset.reportId = activeReportNotificationId || '';
             } else {
                 reportBtn.style.display = 'inline-flex';
                 deleteReportBtn.style.display = 'none';
+                deleteReportBtn.dataset.reportId = '';
             }
 
             openPostActionModal();
@@ -1920,12 +1990,17 @@ $userId = $_SESSION['user_id'] ?? null;
 
         async function handlePostActionToggle() {
             if (!activePostActionId) return;
+            const confirmText = activePostActionStatus === 'Ẩn'
+                ? 'Bạn có chắc chắn muốn hiển thị bài đăng này?'
+                : 'Bạn có chắc chắn muốn ẩn bài đăng này?';
+            if (!confirm(confirmText)) return;
             await togglePostVisibility(activePostActionId);
             closePostActionModal();
         }
 
         async function handlePostActionDelete() {
             if (!activePostActionId) return;
+            if (!confirm('Bạn có chắc chắn muốn xóa bài đăng này?')) return;
             await deletePost(activePostActionId);
             closePostActionModal();
         }
@@ -2087,7 +2162,7 @@ $userId = $_SESSION['user_id'] ?? null;
                     }
 
                     const badge = document.getElementById('notifBadge');
-                    const totalUnread = Number(result.unreadCount || 0) + Number(reportResult ? reportResult.unreadCount : 0);
+                    const totalUnread = Number(result.unreadCount || 0) + (isManager ? Number(reportResult ? reportResult.unreadCount : 0) : 0);
                     if (totalUnread > 0) {
                         badge.style.display = 'flex';
                         badge.textContent = totalUnread;
@@ -2128,12 +2203,12 @@ $userId = $_SESSION['user_id'] ?? null;
                 await fetch('bulletin_api.php', { method: 'POST', body: formData });
             }
 
+            await loadNotifications();
             if (notif.MaBD) {
                 await openPostDetail(notif.MaBD);
             }
 
             document.getElementById('notificationsDropdown').classList.remove('show');
-            await loadNotifications();
         }
 
         async function handleReportNotificationClick(notif) {
@@ -2145,12 +2220,12 @@ $userId = $_SESSION['user_id'] ?? null;
                 await fetch('bulletin_api.php', { method: 'POST', body: formData });
             }
 
+            await loadNotifications();
             if (notif.MaBD) {
                 await openPostDetail(notif.MaBD);
             }
 
             document.getElementById('notificationsDropdown').classList.remove('show');
-            await loadNotifications();
         }
 
         function toggleNotifications() {
@@ -2199,6 +2274,7 @@ $userId = $_SESSION['user_id'] ?? null;
             for (let i = 1; i <= totalPages; i++) {
                 const btn = document.createElement('button');
                 btn.className = `tab-btn ${i === current ? 'active' : ''}`;
+                btn.type = 'button';
                 btn.textContent = i;
                 btn.onclick = () => changePage(i);
                 pagination.appendChild(btn);
@@ -2297,12 +2373,16 @@ $userId = $_SESSION['user_id'] ?? null;
         }
 
         async function handleDeleteReport() {
-            if (!activeReportNotificationId) return;
+            const reportId = activeReportNotificationId || document.getElementById('postActionDeleteReportBtn')?.dataset.reportId;
+            if (!reportId) {
+                alert('Không xác định được báo cáo để xóa');
+                return;
+            }
             if (!confirm('Bạn có chắc chắn muốn xóa báo cáo này?')) return;
 
             const formData = new FormData();
             formData.append('action', 'delete_report_notification');
-            formData.append('maTB', activeReportNotificationId);
+            formData.append('maTB', reportId);
 
             try {
                 const response = await fetch('bulletin_api.php', {
@@ -2354,6 +2434,15 @@ $userId = $_SESSION['user_id'] ?? null;
         function escapeHtmlAttribute(unsafe) {
             if (!unsafe) return '';
             return escapeHtml(unsafe).replace(/\n/g, '&#10;');
+        }
+
+        function getInitials(name) {
+            if (!name) return 'U';
+            const parts = name.trim().split(/\s+/).filter(Boolean);
+            if (!parts.length) return 'U';
+            const first = parts[0][0] || '';
+            const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
+            return (first + last).toUpperCase();
         }
     </script>
 </body>
