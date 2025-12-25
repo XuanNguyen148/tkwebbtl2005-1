@@ -2088,6 +2088,14 @@ $userInitials = getInitialsFromName($userName);
         // ==================== POST DETAIL ====================
         async function openPostDetail(maBD, options = {}) {
             try {
+                const reportNotificationId = options.reportNotificationId ?? activeReportNotificationId ?? null;
+                const detailModal = document.getElementById('postDetailModal');
+                if (detailModal) {
+                    detailModal.dataset.reportNotificationId = reportNotificationId ? String(reportNotificationId) : '';
+                }
+                if (reportNotificationId) {
+                    activeReportNotificationId = reportNotificationId;
+                }
                 const response = await fetch(`bulletin_api.php?action=get_post_detail&maBD=${maBD}`);
                 const result = await response.json();
 
@@ -2096,9 +2104,9 @@ $userInitials = getInitialsFromName($userName);
                     container.innerHTML = '';
                     const card = createPostCard(result.post, {
                         allowTruncate: false,
-                        allowActions: !activeReportNotificationId,
-                        menuMode: activeReportNotificationId ? 'report' : 'standard',
-                        reportNotificationId: activeReportNotificationId,
+                        allowActions: !reportNotificationId,
+                        menuMode: reportNotificationId ? 'report' : 'standard',
+                        reportNotificationId: reportNotificationId,
                         hideCommentAction: options.hideCommentAction === true
                     });
                     container.appendChild(card);
@@ -2122,6 +2130,7 @@ $userInitials = getInitialsFromName($userName);
         function closePostDetailModal() {
             document.getElementById('postDetailModal').classList.remove('show');
             document.getElementById('postDetailBody').innerHTML = '';
+            document.getElementById('postDetailModal').dataset.reportNotificationId = '';
             activeReportNotificationId = null;
         }
 
@@ -2243,7 +2252,10 @@ $userInitials = getInitialsFromName($userName);
             activeReportNotificationId = notif.MaTB;
 
             if (notif.MaBD) {
-                await openPostDetail(notif.MaBD, { hideCommentAction: true });
+                await openPostDetail(notif.MaBD, {
+                    hideCommentAction: true,
+                    reportNotificationId: notif.MaTB
+                });
             }
 
             document.getElementById('notificationsDropdown').classList.remove('show');
@@ -2443,7 +2455,9 @@ $userInitials = getInitialsFromName($userName);
         }
 
         async function handleDeleteReport() {
-            if (!activeReportNotificationId) {
+            const modalReportId = document.getElementById('postDetailModal')?.dataset?.reportNotificationId;
+            const reportId = activeReportNotificationId || (modalReportId ? Number(modalReportId) : null);
+            if (!reportId) {
                 alert('Không tìm thấy báo cáo để xóa.');
                 return;
             }
@@ -2451,7 +2465,7 @@ $userInitials = getInitialsFromName($userName);
 
             const formData = new FormData();
             formData.append('action', 'delete_report_notification');
-            formData.append('maTB', activeReportNotificationId);
+            formData.append('maTB', reportId);
 
             try {
                 const response = await fetch('bulletin_api.php', {

@@ -557,9 +557,9 @@ try {
             }
 
             $stmtDelete = $pdo->prepare("
-                DELETE FROM THONGBAO WHERE MaTB=? AND MaTK=? AND LoaiThongBao='BaoCaoBaiDang'
+                DELETE FROM THONGBAO WHERE MaTB=? AND LoaiThongBao='BaoCaoBaiDang'
             ");
-            $stmtDelete->execute([$maTB, $userId]);
+            $stmtDelete->execute([$maTB]);
 
             if ($stmtDelete->rowCount() === 0) {
                 echo json_encode(['success' => false, 'message' => 'Không tìm thấy báo cáo']);
