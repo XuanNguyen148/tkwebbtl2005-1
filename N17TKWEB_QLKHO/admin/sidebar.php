@@ -26,6 +26,9 @@ if ($userRole == 'Quản lý') {
 
 // Thêm menu Lịch Sử Hoạt Động
 $menu_items[] = ['href' => 'activity_log.php', 'icon' => 'fa-history', 'label' => 'Lịch Sử Hoạt Động'];
+
+// Thêm menu Bảng Tin (cho tất cả người dùng)
+$menu_items[] = ['href' => 'bulletin_board.php', 'icon' => 'fa-bullhorn', 'label' => 'Bảng Tin'];
 ?>
 
 <aside class="sidebar">

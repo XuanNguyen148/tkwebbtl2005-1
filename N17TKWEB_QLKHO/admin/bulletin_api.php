@@ -91,11 +91,19 @@ try {
             $perPage = 10;
             $offset = ($page - 1) * $perPage;
             
-            $where = "WHERE bd.TrangThai = 'Hiển thị'";
+            $visibilityParams = [];
+            if ($userRole === 'Quản lý') {
+                $visibilityCondition = "bd.TrangThai IN ('Hiển thị', 'Ẩn')";
+            } else {
+                $visibilityCondition = "(bd.TrangThai = 'Hiển thị' OR (bd.TrangThai = 'Ẩn' AND bd.MaTK = ?))";
+                $visibilityParams[] = $userId;
+            }
+
+            $where = "WHERE $visibilityCondition";
             
             switch ($filter) {
                 case 'hot':
-                    $where .= " AND (bd.LuotCamXuc + bd.LuotBinhLuan) > 3";
+                    $where .= " AND (bd.LuotCamXuc >= 3 OR bd.LuotBinhLuan >= 3)";
                     break;
                 case 'company':
                     $where .= " AND bd.PhanLoai = 'Bảng tin công ty'";
@@ -119,12 +127,12 @@ try {
                 ORDER BY bd.ThoiGianDang DESC
                 LIMIT $perPage OFFSET $offset
             ");
-            $stmt->execute([$userId, $userId]);
+            $stmt->execute(array_merge([$userId, $userId], $visibilityParams));
             $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             // Lấy tổng số bài đăng
             $stmtCount = $pdo->prepare("SELECT COUNT(*) as total FROM BAIDANG bd $where");
-            $stmtCount->execute();
+            $stmtCount->execute($visibilityParams);
             $total = $stmtCount->fetch(PDO::FETCH_ASSOC)['total'];
             
             // Xử lý dữ liệu
@@ -150,15 +158,23 @@ try {
         case 'get_post_detail':
             $maBD = intval($_GET['maBD'] ?? 0);
             
+            if ($userRole === 'Quản lý') {
+                $visibilityCondition = "bd.TrangThai IN ('Hiển thị', 'Ẩn')";
+                $detailParams = [$userId, $userId, $maBD];
+            } else {
+                $visibilityCondition = "(bd.TrangThai = 'Hiển thị' OR (bd.TrangThai = 'Ẩn' AND bd.MaTK = ?))";
+                $detailParams = [$userId, $userId, $maBD, $userId];
+            }
+
             $stmt = $pdo->prepare("
                 SELECT 
                     bd.*,
                     (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BaiDang' AND MaDoiTuong=bd.MaBD AND MaTK=?) as DaThichBD,
                     (SELECT COUNT(*) FROM THEODOI_BAIDANG WHERE MaBD=bd.MaBD AND MaTK=?) as DangTheoDoi
                 FROM BAIDANG bd
-                WHERE bd.MaBD = ? AND bd.TrangThai = 'Hiển thị'
+                WHERE bd.MaBD = ? AND $visibilityCondition
             ");
-            $stmt->execute([$userId, $userId, $maBD]);
+            $stmt->execute($detailParams);
             $post = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$post) {
@@ -527,13 +543,25 @@ function createCommentNotifications($pdo, $maBD, $maBL, $nguoiBinhLuan, $tenNguo
     
     // 3. Kiểm tra nếu bài đăng trở thành HOT (>3 tương tác) -> thông báo cho tất cả
     $stmtCheck = $pdo->prepare("
-        SELECT (LuotCamXuc + LuotBinhLuan) as TongTuongTac 
+        SELECT LuotCamXuc, LuotBinhLuan
         FROM BAIDANG WHERE MaBD=?
     ");
     $stmtCheck->execute([$maBD]);
-    $tongTuongTac = $stmtCheck->fetch(PDO::FETCH_ASSOC)['TongTuongTac'];
-    
-    if ($tongTuongTac == 4) { // Vừa đạt ngưỡng HOT
+    $counts = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+    $luotCamXuc = intval($counts['LuotCamXuc'] ?? 0);
+    $luotBinhLuan = intval($counts['LuotBinhLuan'] ?? 0);
+
+    if ($luotCamXuc >= 3 || $luotBinhLuan >= 3) {
+        $stmtCheckNotif = $pdo->prepare("
+            SELECT COUNT(*) as total FROM THONGBAO WHERE MaBD=? AND LoaiThongBao='BaiHot'
+        ");
+        $stmtCheckNotif->execute([$maBD]);
+        $existingHot = intval($stmtCheckNotif->fetch(PDO::FETCH_ASSOC)['total']);
+
+        if ($existingHot > 0) {
+            return;
+        }
+
         // Lấy tất cả user (trừ chủ bài)
         $stmtAllUsers = $pdo->prepare("SELECT MaTK FROM TAIKHOAN WHERE MaTK != ?");
         $stmtAllUsers->execute([$post['MaTK']]);
