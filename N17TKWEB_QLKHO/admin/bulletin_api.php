@@ -80,6 +80,9 @@ try {
             
             // Nếu là bài hot (>3 tương tác) - tạo thông báo cho tất cả người dùng
             // (logic này sẽ được xử lý sau khi có tương tác)
+            if ($phanLoai === 'Bảng tin công ty') {
+                createCompanyPostNotifications($pdo, $maBD, $noiDung, $userId);
+            }
             
             echo json_encode(['success' => true, 'message' => 'Đăng bài thành công', 'maBD' => $maBD]);
             break;
@@ -100,6 +103,7 @@ try {
             }
 
             $where = "WHERE $visibilityCondition";
+            $filterParams = [];
             
             switch ($filter) {
                 case 'hot':
@@ -114,25 +118,31 @@ try {
                 case 'qa':
                     $where .= " AND bd.PhanLoai = 'Góc hỏi đáp'";
                     break;
+                case 'mine':
+                    $where .= " AND bd.MaTK = ?";
+                    $filterParams[] = $userId;
+                    break;
             }
             
             // Lấy danh sách bài đăng
             $stmt = $pdo->prepare("
                 SELECT 
                     bd.*,
+                    tk.VaiTro as VaiTroNguoiDang,
                     (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BaiDang' AND MaDoiTuong=bd.MaBD AND MaTK=?) as DaThichBD,
                     (SELECT COUNT(*) FROM THEODOI_BAIDANG WHERE MaBD=bd.MaBD AND MaTK=?) as DangTheoDoi
                 FROM BAIDANG bd
+                LEFT JOIN TAIKHOAN tk ON bd.MaTK = tk.MaTK
                 $where
                 ORDER BY bd.ThoiGianDang DESC
                 LIMIT $perPage OFFSET $offset
             ");
-            $stmt->execute(array_merge([$userId, $userId], $visibilityParams));
+            $stmt->execute(array_merge([$userId, $userId], $visibilityParams, $filterParams));
             $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             // Lấy tổng số bài đăng
             $stmtCount = $pdo->prepare("SELECT COUNT(*) as total FROM BAIDANG bd $where");
-            $stmtCount->execute($visibilityParams);
+            $stmtCount->execute(array_merge($visibilityParams, $filterParams));
             $total = $stmtCount->fetch(PDO::FETCH_ASSOC)['total'];
             
             // Xử lý dữ liệu
@@ -169,9 +179,11 @@ try {
             $stmt = $pdo->prepare("
                 SELECT 
                     bd.*,
+                    tk.VaiTro as VaiTroNguoiDang,
                     (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BaiDang' AND MaDoiTuong=bd.MaBD AND MaTK=?) as DaThichBD,
                     (SELECT COUNT(*) FROM THEODOI_BAIDANG WHERE MaBD=bd.MaBD AND MaTK=?) as DangTheoDoi
                 FROM BAIDANG bd
+                LEFT JOIN TAIKHOAN tk ON bd.MaTK = tk.MaTK
                 WHERE bd.MaBD = ? AND $visibilityCondition
             ");
             $stmt->execute($detailParams);
@@ -191,8 +203,10 @@ try {
             $stmtComments = $pdo->prepare("
                 SELECT 
                     bl.*,
+                    tk.VaiTro as VaiTroNguoiBinhLuan,
                     (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BinhLuan' AND MaDoiTuong=bl.MaBL AND MaTK=?) as DaThichBL
                 FROM BINHLUAN bl
+                LEFT JOIN TAIKHOAN tk ON bl.MaTK = tk.MaTK
                 WHERE bl.MaBD = ?
                 ORDER BY bl.ThoiGianBinhLuan ASC
             ");
@@ -320,6 +334,58 @@ try {
             ]);
             break;
             
+        // ============ BÁO CÁO BÀI ĐĂNG ============ 
+        case 'report_post':
+            $maBD = intval($_POST['maBD'] ?? 0);
+            $lyDo = trim($_POST['lyDo'] ?? '');
+
+            if (!$maBD || $lyDo === '') {
+                echo json_encode(['success' => false, 'message' => 'Thiếu thông tin báo cáo']);
+                exit();
+            }
+
+            $stmtManagers = $pdo->prepare("SELECT MaTK FROM TAIKHOAN WHERE VaiTro='Quản lý'");
+            $stmtManagers->execute();
+            $managers = $stmtManagers->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!$managers) {
+                echo json_encode(['success' => false, 'message' => 'Không tìm thấy quản trị viên']);
+                exit();
+            }
+
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, NguoiTacDong, TenNguoiTacDong, NoiDungRutGon)
+                VALUES (?, 'BaoCao', ?, ?, ?, ?)
+            ");
+
+            foreach ($managers as $manager) {
+                $stmtInsert->execute([
+                    $manager['MaTK'],
+                    $maBD,
+                    $userId,
+                    $userName,
+                    $lyDo
+                ]);
+            }
+
+            echo json_encode(['success' => true, 'message' => 'Đã gửi báo cáo đến quản trị viên']);
+            break;
+            
+        // ============ XÓA BÁO CÁO ============
+        case 'delete_report':
+            $maTB = intval($_POST['maTB'] ?? 0);
+
+            if ($userRole !== 'Quản lý') {
+                echo json_encode(['success' => false, 'message' => 'Không có quyền']);
+                exit();
+            }
+
+            $stmtDelete = $pdo->prepare("DELETE FROM THONGBAO WHERE MaTB=? AND LoaiThongBao='BaoCao'");
+            $stmtDelete->execute([$maTB]);
+
+            echo json_encode(['success' => true, 'message' => 'Đã xóa báo cáo']);
+            break;
+            
         // ============ THEO DÕI BÀI ĐĂNG ============
         case 'toggle_follow':
             $maBD = intval($_POST['maBD'] ?? 0);
@@ -421,6 +487,15 @@ try {
         // ============ LẤY THÔNG BÁO ============
         case 'get_notifications':
             $limit = intval($_GET['limit'] ?? 7);
+            $type = $_GET['type'] ?? 'normal';
+            $notifCondition = '';
+            $notifParams = [$userId];
+
+            if ($userRole === 'Quản lý' && $type === 'report') {
+                $notifCondition = "AND tb.LoaiThongBao = 'BaoCao'";
+            } else {
+                $notifCondition = "AND tb.LoaiThongBao <> 'BaoCao'";
+            }
             
             $stmt = $pdo->prepare("
                 SELECT 
@@ -430,10 +505,11 @@ try {
                 FROM THONGBAO tb
                 LEFT JOIN BAIDANG bd ON tb.MaBD = bd.MaBD
                 WHERE tb.MaTK = ?
+                $notifCondition
                 ORDER BY tb.ThoiGian DESC
                 LIMIT $limit
             ");
-            $stmt->execute([$userId]);
+            $stmt->execute($notifParams);
             $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             // Đếm số thông báo chưa đọc
@@ -584,6 +660,30 @@ function createCommentNotifications($pdo, $maBD, $maBL, $nguoiBinhLuan, $tenNguo
                 $noiDungBaiRutGon
             ]);
         }
+    }
+}
+
+function createCompanyPostNotifications($pdo, $maBD, $noiDung, $maNguoiDang) {
+    $noiDungRutGon = mb_substr($noiDung, 0, 50);
+    if (mb_strlen($noiDung) > 50) {
+        $noiDungRutGon .= '...';
+    }
+
+    $stmtAllUsers = $pdo->prepare("SELECT MaTK FROM TAIKHOAN");
+    $stmtAllUsers->execute();
+    $allUsers = $stmtAllUsers->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmtInsert = $pdo->prepare("
+        INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, NoiDungRutGon)
+        VALUES (?, 'BaiDangCongTy', ?, ?)
+    ");
+
+    foreach ($allUsers as $user) {
+        $stmtInsert->execute([
+            $user['MaTK'],
+            $maBD,
+            $noiDungRutGon
+        ]);
     }
 }
 ?>
