@@ -1,0 +1,561 @@
+<?php
+// admin/bulletin_api.php - API xử lý các request cho Bảng tin
+session_start();
+require_once '../config/db.php';
+
+header('Content-Type: application/json');
+
+// Kiểm tra đăng nhập
+if (!isset($_SESSION['user_id'])) {
+    echo json_encode(['success' => false, 'message' => 'Chưa đăng nhập']);
+    exit();
+}
+
+$userId = $_SESSION['user_id'];
+$userName = $_SESSION['username'];
+$userRole = $_SESSION['role'];
+$action = $_GET['action'] ?? $_POST['action'] ?? '';
+
+try {
+    switch ($action) {
+        // ============ ĐĂNG BÀI ============
+        case 'create_post':
+            $noiDung = trim($_POST['noiDung'] ?? '');
+            $danhTinh = $_POST['danhTinh'] ?? 'Hữu danh';
+            $phanLoai = $_POST['phanLoai'] ?? 'Diễn đàn nhân viên';
+            $trangThai = $_POST['trangThai'] ?? 'Hiển thị';
+            
+            // Kiểm tra quyền đăng bài "Bảng tin công ty"
+            if ($phanLoai === 'Bảng tin công ty' && $userRole !== 'Quản lý') {
+                echo json_encode(['success' => false, 'message' => 'Chỉ Quản lý mới được đăng bài vào Bảng tin công ty']);
+                exit();
+            }
+            
+            if (empty($noiDung)) {
+                echo json_encode(['success' => false, 'message' => 'Vui lòng nhập nội dung bài đăng']);
+                exit();
+            }
+            
+            // Xử lý file đính kèm
+            $fileDinhKem = [];
+            if (!empty($_FILES['files']['name'][0])) {
+                $uploadDir = '../uploads/bulletin/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+                
+                foreach ($_FILES['files']['name'] as $key => $name) {
+                    if ($_FILES['files']['error'][$key] === 0) {
+                        $fileName = time() . '_' . uniqid() . '_' . basename($name);
+                        $targetPath = $uploadDir . $fileName;
+                        
+                        if (move_uploaded_file($_FILES['files']['tmp_name'][$key], $targetPath)) {
+                            $fileDinhKem[] = [
+                                'name' => $name,
+                                'path' => 'uploads/bulletin/' . $fileName,
+                                'type' => $_FILES['files']['type'][$key]
+                            ];
+                        }
+                    }
+                }
+            }
+            
+            $tenNguoiDang = ($danhTinh === 'Ẩn danh') ? 'Ẩn danh' : $userName;
+            
+            $stmt = $pdo->prepare("
+                INSERT INTO BAIDANG (MaTK, TenNguoiDang, NoiDung, DanhTinh, PhanLoai, TrangThai, FileDinhKem)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $userId,
+                $tenNguoiDang,
+                $noiDung,
+                $danhTinh,
+                $phanLoai,
+                $trangThai,
+                json_encode($fileDinhKem)
+            ]);
+            
+            $maBD = $pdo->lastInsertId();
+            
+            // Nếu là bài hot (>3 tương tác) - tạo thông báo cho tất cả người dùng
+            // (logic này sẽ được xử lý sau khi có tương tác)
+            
+            echo json_encode(['success' => true, 'message' => 'Đăng bài thành công', 'maBD' => $maBD]);
+            break;
+            
+        // ============ LẤY DANH SÁCH BÀI ĐĂNG ============
+        case 'get_posts':
+            $filter = $_GET['filter'] ?? 'all';
+            $page = max(1, intval($_GET['page'] ?? 1));
+            $perPage = 10;
+            $offset = ($page - 1) * $perPage;
+            
+            $where = "WHERE bd.TrangThai = 'Hiển thị'";
+            
+            switch ($filter) {
+                case 'hot':
+                    $where .= " AND (bd.LuotCamXuc + bd.LuotBinhLuan) > 3";
+                    break;
+                case 'company':
+                    $where .= " AND bd.PhanLoai = 'Bảng tin công ty'";
+                    break;
+                case 'forum':
+                    $where .= " AND bd.PhanLoai = 'Diễn đàn nhân viên'";
+                    break;
+                case 'qa':
+                    $where .= " AND bd.PhanLoai = 'Góc hỏi đáp'";
+                    break;
+            }
+            
+            // Lấy danh sách bài đăng
+            $stmt = $pdo->prepare("
+                SELECT 
+                    bd.*,
+                    (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BaiDang' AND MaDoiTuong=bd.MaBD AND MaTK=?) as DaThichBD,
+                    (SELECT COUNT(*) FROM THEODOI_BAIDANG WHERE MaBD=bd.MaBD AND MaTK=?) as DangTheoDoi
+                FROM BAIDANG bd
+                $where
+                ORDER BY bd.ThoiGianDang DESC
+                LIMIT $perPage OFFSET $offset
+            ");
+            $stmt->execute([$userId, $userId]);
+            $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Lấy tổng số bài đăng
+            $stmtCount = $pdo->prepare("SELECT COUNT(*) as total FROM BAIDANG bd $where");
+            $stmtCount->execute();
+            $total = $stmtCount->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Xử lý dữ liệu
+            foreach ($posts as &$post) {
+                $post['FileDinhKem'] = json_decode($post['FileDinhKem'], true) ?: [];
+                $post['DaThichBD'] = (bool)$post['DaThichBD'];
+                $post['DangTheoDoi'] = (bool)$post['DangTheoDoi'];
+                
+                // Kiểm tra quyền sửa/xóa
+                $post['CoTheChinhSua'] = ($post['MaTK'] === $userId || $userRole === 'Quản lý');
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'posts' => $posts,
+                'total' => $total,
+                'page' => $page,
+                'totalPages' => ceil($total / $perPage)
+            ]);
+            break;
+            
+        // ============ LẤY CHI TIẾT BÀI ĐĂNG ============
+        case 'get_post_detail':
+            $maBD = intval($_GET['maBD'] ?? 0);
+            
+            $stmt = $pdo->prepare("
+                SELECT 
+                    bd.*,
+                    (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BaiDang' AND MaDoiTuong=bd.MaBD AND MaTK=?) as DaThichBD,
+                    (SELECT COUNT(*) FROM THEODOI_BAIDANG WHERE MaBD=bd.MaBD AND MaTK=?) as DangTheoDoi
+                FROM BAIDANG bd
+                WHERE bd.MaBD = ? AND bd.TrangThai = 'Hiển thị'
+            ");
+            $stmt->execute([$userId, $userId, $maBD]);
+            $post = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$post) {
+                echo json_encode(['success' => false, 'message' => 'Không tìm thấy bài đăng']);
+                exit();
+            }
+            
+            $post['FileDinhKem'] = json_decode($post['FileDinhKem'], true) ?: [];
+            $post['DaThichBD'] = (bool)$post['DaThichBD'];
+            $post['DangTheoDoi'] = (bool)$post['DangTheoDoi'];
+            $post['CoTheChinhSua'] = ($post['MaTK'] === $userId || $userRole === 'Quản lý');
+            
+            // Lấy danh sách bình luận
+            $stmtComments = $pdo->prepare("
+                SELECT 
+                    bl.*,
+                    (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BinhLuan' AND MaDoiTuong=bl.MaBL AND MaTK=?) as DaThichBL
+                FROM BINHLUAN bl
+                WHERE bl.MaBD = ?
+                ORDER BY bl.ThoiGianBinhLuan ASC
+            ");
+            $stmtComments->execute([$userId, $maBD]);
+            $comments = $stmtComments->fetchAll(PDO::FETCH_ASSOC);
+            
+            foreach ($comments as &$comment) {
+                $comment['FileDinhKem'] = json_decode($comment['FileDinhKem'], true) ?: [];
+                $comment['DaThichBL'] = (bool)$comment['DaThichBL'];
+                $comment['CoTheChinhSua'] = ($comment['MaTK'] === $userId || $userRole === 'Quản lý');
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'post' => $post,
+                'comments' => $comments
+            ]);
+            break;
+            
+        // ============ BÌNH LUẬN ============
+        case 'create_comment':
+            $maBD = intval($_POST['maBD'] ?? 0);
+            $noiDung = trim($_POST['noiDung'] ?? '');
+            
+            if (empty($noiDung)) {
+                echo json_encode(['success' => false, 'message' => 'Vui lòng nhập nội dung bình luận']);
+                exit();
+            }
+            
+            // Xử lý file đính kèm
+            $fileDinhKem = [];
+            if (!empty($_FILES['files']['name'][0])) {
+                $uploadDir = '../uploads/bulletin/comments/';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0777, true);
+                }
+                
+                foreach ($_FILES['files']['name'] as $key => $name) {
+                    if ($_FILES['files']['error'][$key] === 0) {
+                        $fileName = time() . '_' . uniqid() . '_' . basename($name);
+                        $targetPath = $uploadDir . $fileName;
+                        
+                        if (move_uploaded_file($_FILES['files']['tmp_name'][$key], $targetPath)) {
+                            $fileDinhKem[] = [
+                                'name' => $name,
+                                'path' => 'uploads/bulletin/comments/' . $fileName,
+                                'type' => $_FILES['files']['type'][$key]
+                            ];
+                        }
+                    }
+                }
+            }
+            
+            $stmt = $pdo->prepare("
+                INSERT INTO BINHLUAN (MaBD, MaTK, TenNguoiBinhLuan, NoiDung, FileDinhKem)
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $maBD,
+                $userId,
+                $userName,
+                $noiDung,
+                json_encode($fileDinhKem)
+            ]);
+            
+            $maBL = $pdo->lastInsertId();
+            
+            // Tạo thông báo
+            createCommentNotifications($pdo, $maBD, $maBL, $userId, $userName, $noiDung);
+            
+            // Tự động theo dõi bài đăng khi bình luận
+            $stmtTheoDoi = $pdo->prepare("
+                INSERT IGNORE INTO THEODOI_BAIDANG (MaTK, MaBD) VALUES (?, ?)
+            ");
+            $stmtTheoDoi->execute([$userId, $maBD]);
+            
+            echo json_encode(['success' => true, 'message' => 'Bình luận thành công', 'maBL' => $maBL]);
+            break;
+            
+        // ============ THÍCH BÀI ĐĂNG/BÌNH LUẬN ============
+        case 'toggle_reaction':
+            $loaiDoiTuong = $_POST['loaiDoiTuong'] ?? 'BaiDang';
+            $maDoiTuong = intval($_POST['maDoiTuong'] ?? 0);
+            $loaiCamXuc = $_POST['loaiCamXuc'] ?? 'Like';
+            
+            // Kiểm tra đã thích chưa
+            $stmtCheck = $pdo->prepare("
+                SELECT MaCX FROM CAMXUC 
+                WHERE MaTK=? AND LoaiDoiTuong=? AND MaDoiTuong=?
+            ");
+            $stmtCheck->execute([$userId, $loaiDoiTuong, $maDoiTuong]);
+            $existing = $stmtCheck->fetch();
+            
+            if ($existing) {
+                // Đã thích -> xóa
+                $stmtDelete = $pdo->prepare("
+                    DELETE FROM CAMXUC WHERE MaCX=?
+                ");
+                $stmtDelete->execute([$existing['MaCX']]);
+                $action = 'removed';
+            } else {
+                // Chưa thích -> thêm
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO CAMXUC (MaTK, LoaiDoiTuong, MaDoiTuong, LoaiCamXuc)
+                    VALUES (?, ?, ?, ?)
+                ");
+                $stmtInsert->execute([$userId, $loaiDoiTuong, $maDoiTuong, $loaiCamXuc]);
+                $action = 'added';
+            }
+            
+            // Lấy số lượt thích mới
+            $table = ($loaiDoiTuong === 'BaiDang') ? 'BAIDANG' : 'BINHLUAN';
+            $idColumn = ($loaiDoiTuong === 'BaiDang') ? 'MaBD' : 'MaBL';
+            
+            $stmtCount = $pdo->prepare("
+                SELECT LuotCamXuc FROM $table WHERE $idColumn=?
+            ");
+            $stmtCount->execute([$maDoiTuong]);
+            $count = $stmtCount->fetch(PDO::FETCH_ASSOC)['LuotCamXuc'];
+            
+            echo json_encode([
+                'success' => true,
+                'action' => $action,
+                'count' => $count
+            ]);
+            break;
+            
+        // ============ THEO DÕI BÀI ĐĂNG ============
+        case 'toggle_follow':
+            $maBD = intval($_POST['maBD'] ?? 0);
+            
+            // Kiểm tra đã theo dõi chưa
+            $stmtCheck = $pdo->prepare("
+                SELECT MaTheoDoi FROM THEODOI_BAIDANG WHERE MaTK=? AND MaBD=?
+            ");
+            $stmtCheck->execute([$userId, $maBD]);
+            $existing = $stmtCheck->fetch();
+            
+            if ($existing) {
+                // Đã theo dõi -> bỏ theo dõi
+                $stmtDelete = $pdo->prepare("
+                    DELETE FROM THEODOI_BAIDANG WHERE MaTheoDoi=?
+                ");
+                $stmtDelete->execute([$existing['MaTheoDoi']]);
+                $isFollowing = false;
+            } else {
+                // Chưa theo dõi -> theo dõi
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO THEODOI_BAIDANG (MaTK, MaBD) VALUES (?, ?)
+                ");
+                $stmtInsert->execute([$userId, $maBD]);
+                $isFollowing = true;
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'isFollowing' => $isFollowing
+            ]);
+            break;
+            
+        // ============ ẨN/HIỆN BÀI ĐĂNG ============
+        case 'toggle_post_visibility':
+            $maBD = intval($_POST['maBD'] ?? 0);
+            
+            // Kiểm tra quyền
+            $stmtCheck = $pdo->prepare("SELECT MaTK, TrangThai FROM BAIDANG WHERE MaBD=?");
+            $stmtCheck->execute([$maBD]);
+            $post = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$post || ($post['MaTK'] !== $userId && $userRole !== 'Quản lý')) {
+                echo json_encode(['success' => false, 'message' => 'Không có quyền']);
+                exit();
+            }
+            
+            $trangThaiMoi = ($post['TrangThai'] === 'Hiển thị') ? 'Ẩn' : 'Hiển thị';
+            
+            $stmtUpdate = $pdo->prepare("UPDATE BAIDANG SET TrangThai=? WHERE MaBD=?");
+            $stmtUpdate->execute([$trangThaiMoi, $maBD]);
+            
+            echo json_encode([
+                'success' => true,
+                'trangThai' => $trangThaiMoi
+            ]);
+            break;
+            
+        // ============ XÓA BÀI ĐĂNG ============
+        case 'delete_post':
+            $maBD = intval($_POST['maBD'] ?? 0);
+            
+            // Kiểm tra quyền
+            $stmtCheck = $pdo->prepare("SELECT MaTK FROM BAIDANG WHERE MaBD=?");
+            $stmtCheck->execute([$maBD]);
+            $post = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$post || ($post['MaTK'] !== $userId && $userRole !== 'Quản lý')) {
+                echo json_encode(['success' => false, 'message' => 'Không có quyền']);
+                exit();
+            }
+            
+            $stmtDelete = $pdo->prepare("UPDATE BAIDANG SET TrangThai='Đã xóa' WHERE MaBD=?");
+            $stmtDelete->execute([$maBD]);
+            
+            echo json_encode(['success' => true, 'message' => 'Đã xóa bài đăng']);
+            break;
+            
+        // ============ XÓA BÌNH LUẬN ============
+        case 'delete_comment':
+            $maBL = intval($_POST['maBL'] ?? 0);
+            
+            // Kiểm tra quyền
+            $stmtCheck = $pdo->prepare("SELECT MaTK FROM BINHLUAN WHERE MaBL=?");
+            $stmtCheck->execute([$maBL]);
+            $comment = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$comment || ($comment['MaTK'] !== $userId && $userRole !== 'Quản lý')) {
+                echo json_encode(['success' => false, 'message' => 'Không có quyền']);
+                exit();
+            }
+            
+            $stmtDelete = $pdo->prepare("DELETE FROM BINHLUAN WHERE MaBL=?");
+            $stmtDelete->execute([$maBL]);
+            
+            echo json_encode(['success' => true, 'message' => 'Đã xóa bình luận']);
+            break;
+            
+        // ============ LẤY THÔNG BÁO ============
+        case 'get_notifications':
+            $limit = intval($_GET['limit'] ?? 7);
+            
+            $stmt = $pdo->prepare("
+                SELECT 
+                    tb.*,
+                    bd.NoiDung as NoiDungBaiDang,
+                    bd.TenNguoiDang
+                FROM THONGBAO tb
+                LEFT JOIN BAIDANG bd ON tb.MaBD = bd.MaBD
+                WHERE tb.MaTK = ?
+                ORDER BY tb.ThoiGian DESC
+                LIMIT $limit
+            ");
+            $stmt->execute([$userId]);
+            $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Đếm số thông báo chưa đọc
+            $stmtCount = $pdo->prepare("
+                SELECT COUNT(*) as unread FROM THONGBAO WHERE MaTK=? AND DaDoc=0
+            ");
+            $stmtCount->execute([$userId]);
+            $unreadCount = $stmtCount->fetch(PDO::FETCH_ASSOC)['unread'];
+            
+            echo json_encode([
+                'success' => true,
+                'notifications' => $notifications,
+                'unreadCount' => $unreadCount
+            ]);
+            break;
+            
+        // ============ ĐÁNH DẤU ĐÃ ĐỌC THÔNG BÁO ============
+        case 'mark_notification_read':
+            $maTB = intval($_POST['maTB'] ?? 0);
+            
+            if ($maTB > 0) {
+                $stmt = $pdo->prepare("UPDATE THONGBAO SET DaDoc=1 WHERE MaTB=? AND MaTK=?");
+                $stmt->execute([$maTB, $userId]);
+            }
+            
+            echo json_encode(['success' => true]);
+            break;
+            
+        // ============ ĐÁNH DẤU TẤT CẢ ĐÃ ĐỌC ============
+        case 'mark_all_read':
+            $stmt = $pdo->prepare("UPDATE THONGBAO SET DaDoc=1 WHERE MaTK=?");
+            $stmt->execute([$userId]);
+            
+            echo json_encode(['success' => true, 'message' => 'Đã đánh dấu tất cả đã đọc']);
+            break;
+            
+        // ============ XÓA TẤT CẢ THÔNG BÁO ============
+        case 'delete_all_notifications':
+            $stmt = $pdo->prepare("DELETE FROM THONGBAO WHERE MaTK=?");
+            $stmt->execute([$userId]);
+            
+            echo json_encode(['success' => true, 'message' => 'Đã xóa tất cả thông báo']);
+            break;
+            
+        default:
+            echo json_encode(['success' => false, 'message' => 'Action không hợp lệ']);
+            break;
+    }
+} catch (Exception $e) {
+    echo json_encode(['success' => false, 'message' => 'Lỗi: ' . $e->getMessage()]);
+}
+
+// Hàm tạo thông báo khi có bình luận mới
+function createCommentNotifications($pdo, $maBD, $maBL, $nguoiBinhLuan, $tenNguoiBinhLuan, $noiDung) {
+    // Rút gọn nội dung
+    $noiDungRutGon = mb_substr($noiDung, 0, 50);
+    if (mb_strlen($noiDung) > 50) {
+        $noiDungRutGon .= '...';
+    }
+    
+    // Lấy thông tin bài đăng
+    $stmtPost = $pdo->prepare("SELECT MaTK, NoiDung FROM BAIDANG WHERE MaBD=?");
+    $stmtPost->execute([$maBD]);
+    $post = $stmtPost->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$post) return;
+    
+    // 1. Thông báo cho chủ bài đăng (nếu không phải chính họ bình luận)
+    if ($post['MaTK'] !== $nguoiBinhLuan) {
+        $stmt = $pdo->prepare("
+            INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, MaBL, NguoiTacDong, TenNguoiTacDong, NoiDungRutGon)
+            VALUES (?, 'BinhLuanBaiCuaBan', ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $post['MaTK'],
+            $maBD,
+            $maBL,
+            $nguoiBinhLuan,
+            $tenNguoiBinhLuan,
+            $noiDungRutGon
+        ]);
+    }
+    
+    // 2. Thông báo cho những người đang theo dõi bài đăng (trừ chủ bài và người bình luận)
+    $stmtFollowers = $pdo->prepare("
+        SELECT DISTINCT MaTK FROM THEODOI_BAIDANG 
+        WHERE MaBD=? AND MaTK NOT IN (?, ?)
+    ");
+    $stmtFollowers->execute([$maBD, $post['MaTK'], $nguoiBinhLuan]);
+    $followers = $stmtFollowers->fetchAll(PDO::FETCH_ASSOC);
+    
+    $stmtInsert = $pdo->prepare("
+        INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, MaBL, NguoiTacDong, TenNguoiTacDong, NoiDungRutGon)
+        VALUES (?, 'BinhLuanBaiTheoDoi', ?, ?, ?, ?, ?)
+    ");
+    
+    foreach ($followers as $follower) {
+        $stmtInsert->execute([
+            $follower['MaTK'],
+            $maBD,
+            $maBL,
+            $nguoiBinhLuan,
+            $tenNguoiBinhLuan,
+            $noiDungRutGon
+        ]);
+    }
+    
+    // 3. Kiểm tra nếu bài đăng trở thành HOT (>3 tương tác) -> thông báo cho tất cả
+    $stmtCheck = $pdo->prepare("
+        SELECT (LuotCamXuc + LuotBinhLuan) as TongTuongTac 
+        FROM BAIDANG WHERE MaBD=?
+    ");
+    $stmtCheck->execute([$maBD]);
+    $tongTuongTac = $stmtCheck->fetch(PDO::FETCH_ASSOC)['TongTuongTac'];
+    
+    if ($tongTuongTac == 4) { // Vừa đạt ngưỡng HOT
+        // Lấy tất cả user (trừ chủ bài)
+        $stmtAllUsers = $pdo->prepare("SELECT MaTK FROM TAIKHOAN WHERE MaTK != ?");
+        $stmtAllUsers->execute([$post['MaTK']]);
+        $allUsers = $stmtAllUsers->fetchAll(PDO::FETCH_ASSOC);
+        
+        $noiDungBaiRutGon = mb_substr($post['NoiDung'], 0, 50);
+        if (mb_strlen($post['NoiDung']) > 50) {
+            $noiDungBaiRutGon .= '...';
+        }
+        
+        $stmtHotNotif = $pdo->prepare("
+            INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, NoiDungRutGon)
+            VALUES (?, 'BaiHot', ?, ?)
+        ");
+        
+        foreach ($allUsers as $user) {
+            $stmtHotNotif->execute([
+                $user['MaTK'],
+                $maBD,
+                $noiDungBaiRutGon
+            ]);
+        }
+    }
+}
+?>
