@@ -2275,18 +2275,34 @@ $userInitials = getInitialsFromName($userName);
             document.getElementById('notifSettingsMenu').classList.toggle('show');
         }
 
+        function getNotificationScopeChoice(actionLabel) {
+            if (!isManager) return 'all';
+            const choice = prompt(`Chọn loại để ${actionLabel}:\n1 - Thông báo thường\n2 - Báo cáo`);
+            if (choice === null) return null;
+            if (choice.trim() === '1') return 'general';
+            if (choice.trim() === '2') return 'reports';
+            alert('Vui lòng chọn 1 hoặc 2.');
+            return null;
+        }
+
         async function markAllAsRead() {
+            const scope = getNotificationScopeChoice('đánh dấu đã đọc tất cả');
+            if (!scope) return;
             const formData = new FormData();
             formData.append('action', 'mark_all_read');
+            formData.append('scope', scope);
 
             await fetch('bulletin_api.php', { method: 'POST', body: formData });
             await loadNotifications();
         }
 
         async function deleteAllNotifications() {
-            if (!confirm('Bạn có chắc chắn muốn xóa tất cả thông báo?')) return;
+            const scope = getNotificationScopeChoice('xóa tất cả');
+            if (!scope) return;
+            if (!confirm('Bạn có chắc chắn muốn xóa tất cả thông báo đã chọn?')) return;
             const formData = new FormData();
             formData.append('action', 'delete_all_notifications');
+            formData.append('scope', scope);
 
             await fetch('bulletin_api.php', { method: 'POST', body: formData });
             await loadNotifications();

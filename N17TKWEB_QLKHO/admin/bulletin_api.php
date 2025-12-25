@@ -625,16 +625,56 @@ try {
             
         // ============ ĐÁNH DẤU TẤT CẢ ĐÃ ĐỌC ============
         case 'mark_all_read':
-            $stmt = $pdo->prepare("UPDATE THONGBAO SET DaDoc=1 WHERE MaTK=?");
-            $stmt->execute([$userId]);
+            $scope = $_POST['scope'] ?? 'all';
+            if ($scope === 'reports' && $userRole !== 'Quản lý') {
+                echo json_encode(['success' => false, 'message' => 'Không có quyền']);
+                exit();
+            }
+
+            if ($scope === 'reports') {
+                $stmt = $pdo->prepare("
+                    UPDATE THONGBAO SET DaDoc=1
+                    WHERE MaTK=? AND LoaiThongBao='BaoCaoBaiDang'
+                ");
+                $stmt->execute([$userId]);
+            } elseif ($scope === 'general') {
+                $stmt = $pdo->prepare("
+                    UPDATE THONGBAO SET DaDoc=1
+                    WHERE MaTK=? AND LoaiThongBao!='BaoCaoBaiDang'
+                ");
+                $stmt->execute([$userId]);
+            } else {
+                $stmt = $pdo->prepare("UPDATE THONGBAO SET DaDoc=1 WHERE MaTK=?");
+                $stmt->execute([$userId]);
+            }
             
             echo json_encode(['success' => true, 'message' => 'Đã đánh dấu tất cả đã đọc']);
             break;
             
         // ============ XÓA TẤT CẢ THÔNG BÁO ============
         case 'delete_all_notifications':
-            $stmt = $pdo->prepare("DELETE FROM THONGBAO WHERE MaTK=?");
-            $stmt->execute([$userId]);
+            $scope = $_POST['scope'] ?? 'all';
+            if ($scope === 'reports' && $userRole !== 'Quản lý') {
+                echo json_encode(['success' => false, 'message' => 'Không có quyền']);
+                exit();
+            }
+
+            if ($scope === 'reports') {
+                $stmt = $pdo->prepare("
+                    DELETE FROM THONGBAO
+                    WHERE MaTK=? AND LoaiThongBao='BaoCaoBaiDang'
+                ");
+                $stmt->execute([$userId]);
+            } elseif ($scope === 'general') {
+                $stmt = $pdo->prepare("
+                    DELETE FROM THONGBAO
+                    WHERE MaTK=? AND LoaiThongBao!='BaoCaoBaiDang'
+                ");
+                $stmt->execute([$userId]);
+            } else {
+                $stmt = $pdo->prepare("DELETE FROM THONGBAO WHERE MaTK=?");
+                $stmt->execute([$userId]);
+            }
             
             echo json_encode(['success' => true, 'message' => 'Đã xóa tất cả thông báo']);
             break;
