@@ -246,6 +246,11 @@ $userInitials = getInitialsFromName($userName);
             overflow: hidden;
         }
 
+        .comment-text.truncated {
+            max-height: 80px;
+            overflow: hidden;
+        }
+
         .post-read-more {
             background: none;
             border: none;
@@ -1255,7 +1260,7 @@ $userInitials = getInitialsFromName($userName);
                     <div class="bulletin-tabs">
                         <button class="tab-btn active" data-filter="all">Tất cả</button>
                         <button class="tab-btn" data-filter="hot">
-                            <i class="fas fa-fire"></i> Bài Hot
+                            <i class="fas fa-fire"></i> Hot
                         </button>
                         <button class="tab-btn" data-filter="mine">Bài viết của tôi</button>
                         <button class="tab-btn" data-filter="company">Bảng tin công ty</button>
@@ -1414,9 +1419,11 @@ $userInitials = getInitialsFromName($userName);
         let activeReportNotificationId = null;
         const isManager = <?php echo ($userRole === 'Quản lý') ? 'true' : 'false'; ?>;
         const MAX_POST_LENGTH = 280;
+        const MAX_COMMENT_LENGTH = 200;
         // Giữ trạng thái phần bình luận đang mở để không bị thu gọn khi reload
         let openComments = new Set();
         let expandedPosts = new Set();
+        let expandedComments = new Set();
 
         // ==================== INIT ====================
         document.addEventListener('DOMContentLoaded', function() {
@@ -1655,6 +1662,7 @@ $userInitials = getInitialsFromName($userName);
             const menuMode = options.menuMode || 'standard';
             const allowActions = options.allowActions !== false;
             const reportNotificationId = options.reportNotificationId || null;
+            const hideCommentAction = options.hideCommentAction === true;
             const card = document.createElement('div');
             const isHidden = post.TrangThai === 'Ẩn';
             card.className = `post-card${isHidden ? ' hidden-post' : ''}`;
@@ -1682,6 +1690,34 @@ $userInitials = getInitialsFromName($userName);
             const shortContent = hasLongContent ? `${escapeHtml(originalContent.slice(0, MAX_POST_LENGTH))}...` : fullContent;
             const followLabel = post.DangTheoDoi ? 'Đang theo dõi' : 'Theo dõi';
             
+            const commentAction = hideCommentAction ? '' : `
+                        <button class="action-btn" onclick="toggleComments(${post.MaBD})">
+                            <i class="fas fa-comment"></i>
+                            <span>Bình luận</span>
+                        </button>
+                    `;
+            const actionButtons = allowActions ? `
+                    <div class="post-actions">
+                        <button class="action-btn ${post.DaThichBD ? 'active' : ''}" data-post-like-btn="${post.MaBD}" onclick="toggleReaction('BaiDang', ${post.MaBD})">
+                            <i class="fas fa-heart"></i>
+                            <span>Thích</span>
+                        </button>
+                        ${commentAction}
+                        <button class="action-btn">
+                            <i class="fas fa-share"></i>
+                            <span>Chia sẻ</span>
+                        </button>
+                        <button class="action-btn ${post.DangTheoDoi ? 'active' : ''}" data-post-follow-btn="${post.MaBD}" data-following="${post.DangTheoDoi ? 'true' : 'false'}" onclick="toggleFollow(${post.MaBD})">
+                            <i class="fas fa-bell"></i>
+                            <span>${followLabel}</span>
+                        </button>
+                    </div>
+                ` : (commentAction ? `
+                    <div class="post-actions">
+                        ${commentAction}
+                    </div>
+                ` : '');
+
             card.innerHTML = `
                 <div class="post-header">
                     <div class="post-author">
@@ -1700,7 +1736,7 @@ $userInitials = getInitialsFromName($userName);
                 
                 <div class="post-content ${shouldTruncate ? 'truncated' : ''}" data-post-id="${post.MaBD}" data-short-content="${escapeHtmlAttribute(shortContent)}" data-full-content="${escapeHtmlAttribute(fullContent)}" data-expanded="${shouldTruncate ? 'false' : 'true'}">${shouldTruncate ? shortContent : fullContent}</div>
                 ${allowTruncate && hasLongContent ? `
-                    <button class="post-read-more" data-read-more="${post.MaBD}" onclick="togglePostContent(${post.MaBD})">${shouldTruncate ? 'Xem thêm' : 'Thu gọn'}</button>
+                    <button class="post-read-more" data-read-more="${post.MaBD}" onclick="togglePostContent(${post.MaBD})">${shouldTruncate ? 'Xem thêm' : 'Ẩn bớt'}</button>
                 ` : ''}
                 
                 ${post.FileDinhKem && post.FileDinhKem.length > 0 ? `
@@ -1725,33 +1761,7 @@ $userInitials = getInitialsFromName($userName);
                     <span><i class="fas fa-comment"></i> <span data-post-comment-count="${post.MaBD}">${post.LuotBinhLuan}</span> bình luận</span>
                 </div>
                 
-                ${allowActions ? `
-                    <div class="post-actions">
-                        <button class="action-btn ${post.DaThichBD ? 'active' : ''}" data-post-like-btn="${post.MaBD}" onclick="toggleReaction('BaiDang', ${post.MaBD})">
-                            <i class="fas fa-heart"></i>
-                            <span>Thích</span>
-                        </button>
-                        <button class="action-btn" onclick="toggleComments(${post.MaBD})">
-                            <i class="fas fa-comment"></i>
-                            <span>Bình luận</span>
-                        </button>
-                        <button class="action-btn">
-                            <i class="fas fa-share"></i>
-                            <span>Chia sẻ</span>
-                        </button>
-                        <button class="action-btn ${post.DangTheoDoi ? 'active' : ''}" data-post-follow-btn="${post.MaBD}" data-following="${post.DangTheoDoi ? 'true' : 'false'}" onclick="toggleFollow(${post.MaBD})">
-                            <i class="fas fa-bell"></i>
-                            <span>${followLabel}</span>
-                        </button>
-                    </div>
-                ` : `
-                    <div class="post-actions">
-                        <button class="action-btn" onclick="toggleComments(${post.MaBD})">
-                            <i class="fas fa-comment"></i>
-                            <span>Bình luận</span>
-                        </button>
-                    </div>
-                `}
+                ${actionButtons}
                 
                 <div class="comments-section" id="comments-${post.MaBD}" style="display:none;">
                     <div class="comments-list"></div>
@@ -1817,16 +1827,26 @@ $userInitials = getInitialsFromName($userName);
             const timeAgo = getTimeAgo(comment.ThoiGianBinhLuan);
             const managerBadge = comment.VaiTro === 'Quản lý' ? '<span class="role-badge">QL</span>' : '';
             
+            const originalContent = comment.NoiDung || '';
+            const fullContent = escapeHtml(originalContent);
+            const hasLongContent = originalContent.length > MAX_COMMENT_LENGTH;
+            const isExpanded = expandedComments.has(comment.MaBL);
+            const shortContent = hasLongContent ? `${escapeHtml(originalContent.slice(0, MAX_COMMENT_LENGTH))}...` : fullContent;
+
+            const commentTextHtml = hasLongContent ? `
+                        <div class="comment-text ${isExpanded ? '' : 'truncated'}" data-comment-id="${comment.MaBL}" data-short-content="${escapeHtmlAttribute(shortContent)}" data-full-content="${escapeHtmlAttribute(fullContent)}" data-expanded="${isExpanded ? 'true' : 'false'}">${isExpanded ? fullContent : shortContent}</div>
+                        <button class="post-read-more" data-read-more-comment="${comment.MaBL}" onclick="toggleCommentContent(${comment.MaBL})">${isExpanded ? 'Ẩn bớt' : 'Xem thêm'}</button>
+                    ` : `<div class="comment-text" data-comment-id="${comment.MaBL}">${fullContent}</div>`;
+
             item.innerHTML = `
                 <div class="comment-avatar">${initials}</div>
                 <div class="comment-content">
                     <div class="comment-bubble">
                         <div class="comment-author">${escapeHtml(comment.TenNguoiBinhLuan)} ${managerBadge}</div>
-                        <div class="comment-text">${escapeHtml(comment.NoiDung)}</div>
+                        ${commentTextHtml}
                     </div>
                     <div class="comment-actions">
-                        <span class="comment-action ${comment.DaThichBL ? 'liked' : ''}" data-comment-like-btn="${comment.MaBL}"
-                              onclick="toggleReaction('BinhLuan', ${comment.MaBL})">
+                        <span class="comment-action ${comment.DaThichBL ? 'liked' : ''}" data-comment-like-btn="${comment.MaBL}" onclick="toggleReaction('BinhLuan', ${comment.MaBL})">
                             <i class="fas fa-heart"></i> <span data-comment-like-count="${comment.MaBL}">${comment.LuotCamXuc > 0 ? comment.LuotCamXuc : 'Thích'}</span>
                         </span>
                         <span class="comment-time">${timeAgo}</span>
@@ -1838,7 +1858,7 @@ $userInitials = getInitialsFromName($userName);
                     </div>
                 </div>
             `;
-            
+
             return item;
         }
 
@@ -2066,7 +2086,7 @@ $userInitials = getInitialsFromName($userName);
         }
 
         // ==================== POST DETAIL ====================
-        async function openPostDetail(maBD) {
+        async function openPostDetail(maBD, options = {}) {
             try {
                 const response = await fetch(`bulletin_api.php?action=get_post_detail&maBD=${maBD}`);
                 const result = await response.json();
@@ -2078,7 +2098,8 @@ $userInitials = getInitialsFromName($userName);
                         allowTruncate: false,
                         allowActions: !activeReportNotificationId,
                         menuMode: activeReportNotificationId ? 'report' : 'standard',
-                        reportNotificationId: activeReportNotificationId
+                        reportNotificationId: activeReportNotificationId,
+                        hideCommentAction: options.hideCommentAction === true
                     });
                     container.appendChild(card);
 
@@ -2147,7 +2168,8 @@ $userInitials = getInitialsFromName($userName);
                                 <div class="notif-content">${renderNotificationText(notif)}</div>
                                 <div class="notif-time">${getTimeAgo(notif.ThoiGian)}</div>
                             `;
-                            item.addEventListener('click', () => handleNotificationClick(notif));
+                            // Pass the clicked element so handler can update UI immediately
+                            item.addEventListener('click', (e) => handleNotificationClick(notif, e.currentTarget || item));
                             list.appendChild(item);
                         });
                     }
@@ -2166,7 +2188,8 @@ $userInitials = getInitialsFromName($userName);
                                     <div class="notif-content">${renderReportNotificationText(notif)}</div>
                                     <div class="notif-time">${getTimeAgo(notif.ThoiGian)}</div>
                                 `;
-                                item.addEventListener('click', () => handleReportNotificationClick(notif));
+                                    // Pass the clicked element so handler can update UI immediately
+                                    item.addEventListener('click', (e) => handleReportNotificationClick(notif, e.currentTarget || item));
                                 reportList.appendChild(item);
                             });
                         }
@@ -2189,13 +2212,13 @@ $userInitials = getInitialsFromName($userName);
         function renderNotificationText(notif) {
             switch (notif.LoaiThongBao) {
                 case 'BinhLuanBaiCuaBan':
-                    return `<strong>${escapeHtml(notif.TenNguoiTacDong || '')}</strong> đã bình luận bài viết của bạn: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
+                    return `${escapeHtml(notif.TenNguoiTacDong || '')} đã bình luận bài viết của bạn: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
                 case 'BinhLuanBaiTheoDoi':
-                    return `<strong>${escapeHtml(notif.TenNguoiTacDong || '')}</strong> đã bình luận bài bạn theo dõi: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
+                    return `${escapeHtml(notif.TenNguoiTacDong || '')} đã bình luận bài bạn theo dõi: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
                 case 'BaiHot':
-                    return `Bài viết đang hot: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
+                    return `<strong>Hot </strong><i class="fas fa-fire"></i>: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
                 case 'BaiDangCongTy':
-                    return `Bảng tin công ty có bài đăng mới: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
+                    return `<strong>Thông báo mới từ công ty</strong>: “${escapeHtml(notif.NoiDungRutGon || '')}”`;
                 default:
                     return escapeHtml(notif.NoiDungRutGon || 'Bạn có thông báo mới');
             }
@@ -2207,19 +2230,9 @@ $userInitials = getInitialsFromName($userName);
 
         async function handleNotificationClick(notif) {
             activeReportNotificationId = null;
-            if (notif.MaTB) {
-                const formData = new FormData();
-                formData.append('action', 'mark_notification_read');
-                formData.append('maTB', notif.MaTB);
-                await fetch('bulletin_api.php', { method: 'POST', body: formData });
-            }
-
-            if (notif.DaDoc == 0) {
-                adjustNotificationBadge(-1);
-            }
 
             if (notif.MaBD) {
-                await openPostDetail(notif.MaBD);
+                await openPostDetail(notif.MaBD, { hideCommentAction: true });
             }
 
             document.getElementById('notificationsDropdown').classList.remove('show');
@@ -2228,19 +2241,9 @@ $userInitials = getInitialsFromName($userName);
 
         async function handleReportNotificationClick(notif) {
             activeReportNotificationId = notif.MaTB;
-            if (notif.MaTB) {
-                const formData = new FormData();
-                formData.append('action', 'mark_notification_read');
-                formData.append('maTB', notif.MaTB);
-                await fetch('bulletin_api.php', { method: 'POST', body: formData });
-            }
-
-            if (notif.DaDoc == 0) {
-                adjustNotificationBadge(-1);
-            }
 
             if (notif.MaBD) {
-                await openPostDetail(notif.MaBD);
+                await openPostDetail(notif.MaBD, { hideCommentAction: true });
             }
 
             document.getElementById('notificationsDropdown').classList.remove('show');
@@ -2315,12 +2318,30 @@ $userInitials = getInitialsFromName($userName);
             content.dataset.expanded = isExpanded ? 'false' : 'true';
             content.innerHTML = isExpanded ? content.dataset.shortContent : content.dataset.fullContent;
             content.classList.toggle('truncated', isExpanded);
-            button.textContent = isExpanded ? 'Xem thêm' : 'Thu gọn';
+            button.textContent = isExpanded ? 'Xem thêm' : 'Ẩn bớt';
 
             if (isExpanded) {
                 expandedPosts.delete(maBD);
             } else {
                 expandedPosts.add(maBD);
+            }
+        }
+
+        function toggleCommentContent(maBL) {
+            const content = document.querySelector(`.comment-text[data-comment-id="${maBL}"]`);
+            const button = document.querySelector(`[data-read-more-comment="${maBL}"]`);
+            if (!content || !button) return;
+
+            const isExpanded = content.dataset.expanded === 'true';
+            content.dataset.expanded = isExpanded ? 'false' : 'true';
+            content.innerHTML = isExpanded ? content.dataset.shortContent : content.dataset.fullContent;
+            content.classList.toggle('truncated', isExpanded);
+            button.textContent = isExpanded ? 'Xem thêm' : 'Ẩn bớt';
+
+            if (isExpanded) {
+                expandedComments.delete(maBL);
+            } else {
+                expandedComments.add(maBL);
             }
         }
 
