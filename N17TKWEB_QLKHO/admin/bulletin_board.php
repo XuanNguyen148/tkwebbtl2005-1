@@ -1110,30 +1110,6 @@ $userInitials = getInitialsFromName($userName);
             background: #eef4ff;
         }
 
-        .notif-scope-options {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 16px;
-        }
-
-        .notif-scope-option {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            cursor: pointer;
-            background: #f8fafc;
-        }
-
-        .notif-scope-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 16px;
-        }
 
         /* Loading spinner */
         .loading {
@@ -1424,27 +1400,6 @@ $userInitials = getInitialsFromName($userName);
                 </div>
             </div>
 
-            <div class="report-modal" id="notifScopeModal">
-                <div class="report-content">
-                    <h3 id="notifScopeTitle">Chọn loại thông báo</h3>
-                    <p id="notifScopeDesc">Vui lòng chọn loại thông báo muốn xử lý:</p>
-                    <div class="notif-scope-options">
-                        <label class="notif-scope-option">
-                            <input type="radio" name="notifScope" value="general">
-                            <span>Thông báo thường</span>
-                        </label>
-                        <label class="notif-scope-option">
-                            <input type="radio" name="notifScope" value="reports">
-                            <span>Báo cáo</span>
-                        </label>
-                    </div>
-                    <div class="notif-scope-actions">
-                        <button class="post-action-cancel" onclick="closeNotifScopeModal()">Hủy</button>
-                        <button class="post-action-delete" onclick="confirmNotifScope()">Xác nhận</button>
-                    </div>
-                </div>
-            </div>
-
             <button class="scroll-top-btn" id="scrollToTopBtn" aria-label="Lên đầu trang">
                 <i class="fas fa-arrow-up"></i>
             </button>
@@ -1537,11 +1492,6 @@ $userInitials = getInitialsFromName($userName);
             }
         });
 
-        document.getElementById('notifScopeModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeNotifScopeModal();
-            }
-        });
 
             document.addEventListener('click', function(event) {
                 const dropdown = document.getElementById('notificationsDropdown');
@@ -2327,64 +2277,18 @@ $userInitials = getInitialsFromName($userName);
             document.getElementById('notifSettingsMenu').classList.toggle('show');
         }
 
-        let notifScopeResolver = null;
-
-        function openNotifScopeModal(actionLabel) {
-            return new Promise(resolve => {
-                notifScopeResolver = resolve;
-                document.getElementById('notifScopeTitle').textContent = `Chọn loại để ${actionLabel}`;
-                document.getElementById('notifScopeDesc').textContent = 'Vui lòng chọn loại thông báo muốn xử lý:';
-                document.querySelectorAll('input[name="notifScope"]').forEach(input => {
-                    input.checked = false;
-                });
-                document.getElementById('notifScopeModal').classList.add('show');
-            });
-        }
-
-        function closeNotifScopeModal() {
-            document.getElementById('notifScopeModal').classList.remove('show');
-            if (notifScopeResolver) {
-                notifScopeResolver(null);
-                notifScopeResolver = null;
-            }
-        }
-
-        function confirmNotifScope() {
-            const selected = document.querySelector('input[name="notifScope"]:checked');
-            if (!selected) {
-                alert('Vui lòng chọn một loại thông báo.');
-                return;
-            }
-            document.getElementById('notifScopeModal').classList.remove('show');
-            if (notifScopeResolver) {
-                notifScopeResolver(selected.value);
-                notifScopeResolver = null;
-            }
-        }
-
-        async function getNotificationScopeChoice(actionLabel) {
-            if (!isManager) return 'all';
-            return await openNotifScopeModal(actionLabel);
-        }
-
         async function markAllAsRead() {
-            const scope = getNotificationScopeChoice('đánh dấu đã đọc tất cả');
-            if (!scope) return;
             const formData = new FormData();
             formData.append('action', 'mark_all_read');
-            formData.append('scope', scope);
 
             await fetch('bulletin_api.php', { method: 'POST', body: formData });
             await loadNotifications();
         }
 
         async function deleteAllNotifications() {
-            const scope = getNotificationScopeChoice('xóa tất cả');
-            if (!scope) return;
-            if (!confirm('Bạn có chắc chắn muốn xóa tất cả thông báo đã chọn?')) return;
+            if (!confirm('Bạn có chắc chắn muốn xóa tất cả thông báo thường?')) return;
             const formData = new FormData();
             formData.append('action', 'delete_all_notifications');
-            formData.append('scope', scope);
 
             await fetch('bulletin_api.php', { method: 'POST', body: formData });
             await loadNotifications();
