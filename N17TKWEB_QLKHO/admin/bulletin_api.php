@@ -91,11 +91,11 @@ try {
             $perPage = 10;
             $offset = ($page - 1) * $perPage;
             
-            $where = "WHERE bd.TrangThai = 'Hiển thị'";
+            $where = "WHERE (bd.TrangThai = 'Hiển thị' OR (bd.TrangThai = 'Ẩn' AND bd.MaTK = ?))";
             
             switch ($filter) {
                 case 'hot':
-                    $where .= " AND (bd.LuotCamXuc + bd.LuotBinhLuan) > 3";
+                    $where .= " AND (bd.LuotCamXuc >= 3 OR bd.LuotBinhLuan >= 3)";
                     break;
                 case 'company':
                     $where .= " AND bd.PhanLoai = 'Bảng tin công ty'";
@@ -119,12 +119,12 @@ try {
                 ORDER BY bd.ThoiGianDang DESC
                 LIMIT $perPage OFFSET $offset
             ");
-            $stmt->execute([$userId, $userId]);
+            $stmt->execute([$userId, $userId, $userId]);
             $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             // Lấy tổng số bài đăng
             $stmtCount = $pdo->prepare("SELECT COUNT(*) as total FROM BAIDANG bd $where");
-            $stmtCount->execute();
+            $stmtCount->execute([$userId]);
             $total = $stmtCount->fetch(PDO::FETCH_ASSOC)['total'];
             
             // Xử lý dữ liệu
@@ -156,9 +156,9 @@ try {
                     (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BaiDang' AND MaDoiTuong=bd.MaBD AND MaTK=?) as DaThichBD,
                     (SELECT COUNT(*) FROM THEODOI_BAIDANG WHERE MaBD=bd.MaBD AND MaTK=?) as DangTheoDoi
                 FROM BAIDANG bd
-                WHERE bd.MaBD = ? AND bd.TrangThai = 'Hiển thị'
+                WHERE bd.MaBD = ? AND (bd.TrangThai = 'Hiển thị' OR (bd.TrangThai = 'Ẩn' AND bd.MaTK = ?))
             ");
-            $stmt->execute([$userId, $userId, $maBD]);
+            $stmt->execute([$userId, $userId, $maBD, $userId]);
             $post = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$post) {
@@ -296,6 +296,10 @@ try {
             ");
             $stmtCount->execute([$maDoiTuong]);
             $count = $stmtCount->fetch(PDO::FETCH_ASSOC)['LuotCamXuc'];
+
+            if ($loaiDoiTuong === 'BaiDang') {
+                maybeCreateHotNotifications($pdo, $maDoiTuong);
+            }
             
             echo json_encode([
                 'success' => true,
@@ -525,37 +529,55 @@ function createCommentNotifications($pdo, $maBD, $maBL, $nguoiBinhLuan, $tenNguo
         ]);
     }
     
-    // 3. Kiểm tra nếu bài đăng trở thành HOT (>3 tương tác) -> thông báo cho tất cả
+    maybeCreateHotNotifications($pdo, $maBD);
+}
+
+function maybeCreateHotNotifications($pdo, $maBD) {
     $stmtCheck = $pdo->prepare("
-        SELECT (LuotCamXuc + LuotBinhLuan) as TongTuongTac 
+        SELECT MaTK, NoiDung, LuotCamXuc, LuotBinhLuan
         FROM BAIDANG WHERE MaBD=?
     ");
     $stmtCheck->execute([$maBD]);
-    $tongTuongTac = $stmtCheck->fetch(PDO::FETCH_ASSOC)['TongTuongTac'];
-    
-    if ($tongTuongTac == 4) { // Vừa đạt ngưỡng HOT
-        // Lấy tất cả user (trừ chủ bài)
-        $stmtAllUsers = $pdo->prepare("SELECT MaTK FROM TAIKHOAN WHERE MaTK != ?");
-        $stmtAllUsers->execute([$post['MaTK']]);
-        $allUsers = $stmtAllUsers->fetchAll(PDO::FETCH_ASSOC);
-        
-        $noiDungBaiRutGon = mb_substr($post['NoiDung'], 0, 50);
-        if (mb_strlen($post['NoiDung']) > 50) {
-            $noiDungBaiRutGon .= '...';
-        }
-        
-        $stmtHotNotif = $pdo->prepare("
-            INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, NoiDungRutGon)
-            VALUES (?, 'BaiHot', ?, ?)
-        ");
-        
-        foreach ($allUsers as $user) {
-            $stmtHotNotif->execute([
-                $user['MaTK'],
-                $maBD,
-                $noiDungBaiRutGon
-            ]);
-        }
+    $post = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+    if (!$post) {
+        return;
+    }
+
+    if ($post['LuotCamXuc'] < 3 && $post['LuotBinhLuan'] < 3) {
+        return;
+    }
+
+    $stmtExisting = $pdo->prepare("
+        SELECT COUNT(*) as total FROM THONGBAO WHERE MaBD=? AND LoaiThongBao='BaiHot'
+    ");
+    $stmtExisting->execute([$maBD]);
+    $hasHotNotif = $stmtExisting->fetch(PDO::FETCH_ASSOC)['total'];
+
+    if ($hasHotNotif > 0) {
+        return;
+    }
+
+    $stmtAllUsers = $pdo->prepare("SELECT MaTK FROM TAIKHOAN WHERE MaTK != ?");
+    $stmtAllUsers->execute([$post['MaTK']]);
+    $allUsers = $stmtAllUsers->fetchAll(PDO::FETCH_ASSOC);
+
+    $noiDungBaiRutGon = mb_substr($post['NoiDung'], 0, 50);
+    if (mb_strlen($post['NoiDung']) > 50) {
+        $noiDungBaiRutGon .= '...';
+    }
+
+    $stmtHotNotif = $pdo->prepare("
+        INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, NoiDungRutGon)
+        VALUES (?, 'BaiHot', ?, ?)
+    ");
+
+    foreach ($allUsers as $user) {
+        $stmtHotNotif->execute([
+            $user['MaTK'],
+            $maBD,
+            $noiDungBaiRutGon
+        ]);
     }
 }
 ?>
