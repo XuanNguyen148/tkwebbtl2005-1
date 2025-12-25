@@ -526,19 +526,35 @@ try {
                 $noiDungRutGon .= '...';
             }
 
-            $stmtInsert = $pdo->prepare("
-                INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, NguoiTacDong, TenNguoiTacDong, NoiDungRutGon)
-                VALUES (?, 'BaoCaoBaiDang', ?, ?, ?, ?)
-            ");
+            $pdo->beginTransaction();
+            try {
+                $stmtReport = $pdo->prepare("
+                    INSERT INTO BAOCAO_BAIDANG (MaBD, MaTK, LyDo)
+                    VALUES (?, ?, ?)
+                ");
+                $stmtReport->execute([$maBD, $userId, $lyDo]);
+                $maBC = $pdo->lastInsertId();
 
-            foreach ($managers as $manager) {
-                $stmtInsert->execute([
-                    $manager['MaTK'],
-                    $maBD,
-                    $userId,
-                    $userName,
-                    $noiDungRutGon
-                ]);
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, MaBC, NguoiTacDong, TenNguoiTacDong, NoiDungRutGon)
+                    VALUES (?, 'BaoCaoBaiDang', ?, ?, ?, ?, ?)
+                ");
+
+                foreach ($managers as $manager) {
+                    $stmtInsert->execute([
+                        $manager['MaTK'],
+                        $maBD,
+                        $maBC,
+                        $userId,
+                        $userName,
+                        $noiDungRutGon
+                    ]);
+                }
+
+                $pdo->commit();
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                throw $e;
             }
 
             echo json_encode(['success' => true, 'message' => 'Đã gửi báo cáo']);
@@ -556,14 +572,40 @@ try {
                 exit();
             }
 
-            $stmtDelete = $pdo->prepare("
-                DELETE FROM THONGBAO WHERE MaTB=? AND LoaiThongBao='BaoCaoBaiDang'
+            $stmtFind = $pdo->prepare("
+                SELECT MaBC FROM THONGBAO WHERE MaTB=? AND LoaiThongBao='BaoCaoBaiDang'
             ");
-            $stmtDelete->execute([$maTB]);
+            $stmtFind->execute([$maTB]);
+            $reportRow = $stmtFind->fetch(PDO::FETCH_ASSOC);
 
-            if ($stmtDelete->rowCount() === 0) {
+            if (!$reportRow) {
                 echo json_encode(['success' => false, 'message' => 'Không tìm thấy báo cáo']);
                 exit();
+            }
+
+            $maBC = $reportRow['MaBC'];
+            $pdo->beginTransaction();
+            try {
+                if (!empty($maBC)) {
+                    $stmtDeleteNotifs = $pdo->prepare("
+                        DELETE FROM THONGBAO WHERE MaBC=? AND LoaiThongBao='BaoCaoBaiDang'
+                    ");
+                    $stmtDeleteNotifs->execute([$maBC]);
+
+                    $stmtDeleteReport = $pdo->prepare("
+                        DELETE FROM BAOCAO_BAIDANG WHERE MaBC=?
+                    ");
+                    $stmtDeleteReport->execute([$maBC]);
+                } else {
+                    $stmtDeleteNotifs = $pdo->prepare("
+                        DELETE FROM THONGBAO WHERE MaTB=? AND LoaiThongBao='BaoCaoBaiDang'
+                    ");
+                    $stmtDeleteNotifs->execute([$maTB]);
+                }
+                $pdo->commit();
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                throw $e;
             }
 
             echo json_encode(['success' => true, 'message' => 'Đã xóa báo cáo']);
