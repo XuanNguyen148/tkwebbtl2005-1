@@ -1655,6 +1655,7 @@ $userInitials = getInitialsFromName($userName);
             const menuMode = options.menuMode || 'standard';
             const allowActions = options.allowActions !== false;
             const reportNotificationId = options.reportNotificationId || null;
+            const showCommentAction = options.showCommentAction !== false;
             const card = document.createElement('div');
             const isHidden = post.TrangThai === 'Ẩn';
             card.className = `post-card${isHidden ? ' hidden-post' : ''}`;
@@ -1744,14 +1745,14 @@ $userInitials = getInitialsFromName($userName);
                             <span>${followLabel}</span>
                         </button>
                     </div>
-                ` : `
+                ` : showCommentAction ? `
                     <div class="post-actions">
                         <button class="action-btn" onclick="toggleComments(${post.MaBD})">
                             <i class="fas fa-comment"></i>
                             <span>Bình luận</span>
                         </button>
                     </div>
-                `}
+                ` : ''}
                 
                 <div class="comments-section" id="comments-${post.MaBD}" style="display:none;">
                     <div class="comments-list"></div>
@@ -2078,7 +2079,8 @@ $userInitials = getInitialsFromName($userName);
                         allowTruncate: false,
                         allowActions: !activeReportNotificationId,
                         menuMode: activeReportNotificationId ? 'report' : 'standard',
-                        reportNotificationId: activeReportNotificationId
+                        reportNotificationId: activeReportNotificationId,
+                        showCommentAction: false
                     });
                     container.appendChild(card);
 
