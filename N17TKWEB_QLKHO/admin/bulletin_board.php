@@ -11,6 +11,23 @@ if (!isset($_SESSION['user_id'])) {
 $userName = $_SESSION['username'] ?? 'Người dùng';
 $userRole = $_SESSION['role'] ?? 'Nhân viên';
 $userId = $_SESSION['user_id'] ?? null;
+
+function getInitialsFromName($name) {
+    $name = trim($name ?? '');
+    if ($name === '') {
+        return '';
+    }
+    $parts = preg_split('/\s+/', $name);
+    if (!$parts || count($parts) === 0) {
+        return '';
+    }
+    $first = mb_substr($parts[0], 0, 1, 'UTF-8');
+    $last = mb_substr($parts[count($parts) - 1], 0, 1, 'UTF-8');
+    $initials = $first . ($last && $last !== $first ? $last : '');
+    return mb_strtoupper($initials, 'UTF-8');
+}
+
+$userInitials = getInitialsFromName($userName);
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -858,6 +875,34 @@ $userId = $_SESSION['user_id'] ?? null;
             font-size: 12px;
         }
 
+        /* Scroll to top button */
+        .scroll-top-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary);
+            color: white;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            z-index: 9998;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .scroll-top-btn.show {
+            display: flex;
+        }
+
+        .scroll-top-btn:hover {
+            transform: translateY(-2px);
+        }
+
         /* Post actions modal */
         .post-action-modal {
             display: none;
@@ -1117,6 +1162,11 @@ $userId = $_SESSION['user_id'] ?? null;
                 right: -15px;
             }
 
+            .scroll-top-btn {
+                right: 15px;
+                bottom: 20px;
+            }
+
             .modal-content {
                 width: 95%;
                 padding: 20px;
@@ -1140,7 +1190,7 @@ $userId = $_SESSION['user_id'] ?? null;
                 <div class="user-name"><?php echo htmlspecialchars($userName); ?></div>
                 <div class="user-role"><?php echo htmlspecialchars($userRole); ?></div>
             </div>
-            <div class="user-avatar"> <i class="fas fa-user"></i> </div>
+            <div class="user-avatar"><?php echo htmlspecialchars($userInitials); ?></div>
         </div>
     </header>
 
@@ -1343,6 +1393,10 @@ $userId = $_SESSION['user_id'] ?? null;
                     </div>
                 </div>
             </div>
+
+            <button class="scroll-top-btn" id="scrollToTopBtn" aria-label="Lên đầu trang">
+                <i class="fas fa-arrow-up"></i>
+            </button>
         </main>
     </div>
 
@@ -1370,6 +1424,7 @@ $userId = $_SESSION['user_id'] ?? null;
             loadNotifications();
             startNotificationPolling();
             setupEventListeners();
+            setupScrollToTop();
         });
 
         // ==================== EVENT LISTENERS ====================
@@ -1440,6 +1495,23 @@ $userId = $_SESSION['user_id'] ?? null;
 
                 if (settingsMenu.classList.contains('show') && !settingsMenu.contains(event.target)) {
                     settingsMenu.classList.remove('show');
+                }
+            });
+        }
+
+        function setupScrollToTop() {
+            const scrollBtn = document.getElementById('scrollToTopBtn');
+            if (!scrollBtn) return;
+
+            scrollBtn.addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 300) {
+                    scrollBtn.classList.add('show');
+                } else {
+                    scrollBtn.classList.remove('show');
                 }
             });
         }
@@ -1582,6 +1654,7 @@ $userId = $_SESSION['user_id'] ?? null;
             const allowTruncate = options.allowTruncate !== false;
             const menuMode = options.menuMode || 'standard';
             const allowActions = options.allowActions !== false;
+            const reportNotificationId = options.reportNotificationId || null;
             const card = document.createElement('div');
             const isHidden = post.TrangThai === 'Ẩn';
             card.className = `post-card${isHidden ? ' hidden-post' : ''}`;
@@ -1594,7 +1667,7 @@ $userId = $_SESSION['user_id'] ?? null;
             if (post.PhanLoai === 'Góc hỏi đáp') categoryClass = 'category-qa';
             
             // Author initials
-            const initials = post.TenNguoiDang.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            const initials = getInitialsFromName(post.TenNguoiDang);
             const showManagerBadge = post.VaiTro === 'Quản lý' && post.DanhTinh !== 'Ẩn danh';
             const managerBadge = showManagerBadge ? '<span class="role-badge">QL</span>' : '';
             
@@ -1607,6 +1680,7 @@ $userId = $_SESSION['user_id'] ?? null;
             const hasLongContent = originalContent.length > MAX_POST_LENGTH;
             const shouldTruncate = allowTruncate && hasLongContent && !isExpanded;
             const shortContent = hasLongContent ? `${escapeHtml(originalContent.slice(0, MAX_POST_LENGTH))}...` : fullContent;
+            const followLabel = post.DangTheoDoi ? 'Đang theo dõi' : 'Theo dõi';
             
             card.innerHTML = `
                 <div class="post-header">
@@ -1619,7 +1693,7 @@ $userId = $_SESSION['user_id'] ?? null;
                             ${isHidden ? '<span class="post-status-badge"><i class="fas fa-eye-slash"></i> Đang ẩn</span>' : ''}
                         </div>
                     </div>
-                    <button class="post-menu-btn" onclick="showPostMenu(${post.MaBD}, event, '${menuMode}', ${post.CoTheChinhSua})">
+                    <button class="post-menu-btn" onclick="showPostMenu(${post.MaBD}, event, '${menuMode}', ${post.CoTheChinhSua}, ${reportNotificationId ? reportNotificationId : 'null'})">
                         <i class="fas fa-ellipsis-v"></i>
                     </button>
                 </div>
@@ -1648,7 +1722,7 @@ $userId = $_SESSION['user_id'] ?? null;
                 
                 <div class="post-stats">
                     <span><i class="fas fa-heart"></i> <span data-post-like-count="${post.MaBD}">${post.LuotCamXuc}</span> lượt thích</span>
-                    <span><i class="fas fa-comment"></i> ${post.LuotBinhLuan} bình luận</span>
+                    <span><i class="fas fa-comment"></i> <span data-post-comment-count="${post.MaBD}">${post.LuotBinhLuan}</span> bình luận</span>
                 </div>
                 
                 ${allowActions ? `
@@ -1665,9 +1739,9 @@ $userId = $_SESSION['user_id'] ?? null;
                             <i class="fas fa-share"></i>
                             <span>Chia sẻ</span>
                         </button>
-                        <button class="action-btn ${post.DangTheoDoi ? 'active' : ''}" onclick="toggleFollow(${post.MaBD})">
+                        <button class="action-btn ${post.DangTheoDoi ? 'active' : ''}" data-post-follow-btn="${post.MaBD}" data-following="${post.DangTheoDoi ? 'true' : 'false'}" onclick="toggleFollow(${post.MaBD})">
                             <i class="fas fa-bell"></i>
-                            <span>Theo dõi</span>
+                            <span>${followLabel}</span>
                         </button>
                     </div>
                 ` : `
@@ -1723,17 +1797,23 @@ $userId = $_SESSION['user_id'] ?? null;
                     result.comments.forEach(comment => {
                         commentsList.appendChild(createCommentItem(comment));
                     });
+
+                    if (result.post && typeof result.post.LuotBinhLuan !== 'undefined') {
+                        updatePostCommentCount(maBD, result.post.LuotBinhLuan);
+                    }
                 }
+                return result;
             } catch (error) {
                 console.error('Error loading comments:', error);
             }
+            return null;
         }
 
         function createCommentItem(comment) {
             const item = document.createElement('div');
             item.className = 'comment-item';
             
-            const initials = comment.TenNguoiBinhLuan.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            const initials = getInitialsFromName(comment.TenNguoiBinhLuan);
             const timeAgo = getTimeAgo(comment.ThoiGianBinhLuan);
             const managerBadge = comment.VaiTro === 'Quản lý' ? '<span class="role-badge">QL</span>' : '';
             
@@ -1785,7 +1865,6 @@ $userId = $_SESSION['user_id'] ?? null;
                     inputElement.value = '';
                     const rootCard = inputElement.closest('.post-card') || document;
                     await loadComments(maBD, rootCard);
-                    await loadPosts(); // Reload to update comment count
                 } else {
                     alert('Lỗi: ' + result.message);
                 }
@@ -1860,7 +1939,7 @@ $userId = $_SESSION['user_id'] ?? null;
                 const result = await response.json();
                 
                 if (result.success) {
-                    await loadPosts();
+                    updateFollowState(maBD, result.isFollowing);
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -1868,13 +1947,16 @@ $userId = $_SESSION['user_id'] ?? null;
         }
 
         // ==================== POST MENU ====================
-        function showPostMenu(maBD, event, mode = 'standard', canEdit = false) {
+        function showPostMenu(maBD, event, mode = 'standard', canEdit = false, reportNotificationId = null) {
             event.stopPropagation();
             const card = document.querySelector(`[data-post-id="${maBD}"]`);
             activePostActionId = maBD;
             activePostActionStatus = card ? card.dataset.status : 'Hiển thị';
             activePostActionMode = mode;
             activePostCanEdit = canEdit;
+            if (mode === 'report' && reportNotificationId) {
+                activeReportNotificationId = reportNotificationId;
+            }
 
             const toggleBtn = document.getElementById('postActionToggleBtn');
             const reportBtn = document.getElementById('postActionReportBtn');
@@ -1920,12 +2002,15 @@ $userId = $_SESSION['user_id'] ?? null;
 
         async function handlePostActionToggle() {
             if (!activePostActionId) return;
+            const actionLabel = activePostActionStatus === 'Ẩn' ? 'hiện' : 'ẩn';
+            if (!confirm(`Bạn có chắc chắn muốn ${actionLabel} bài đăng này?`)) return;
             await togglePostVisibility(activePostActionId);
             closePostActionModal();
         }
 
         async function handlePostActionDelete() {
             if (!activePostActionId) return;
+            if (!confirm('Bạn có chắc chắn muốn xóa bài đăng này?')) return;
             await deletePost(activePostActionId);
             closePostActionModal();
         }
@@ -1992,7 +2077,8 @@ $userId = $_SESSION['user_id'] ?? null;
                     const card = createPostCard(result.post, {
                         allowTruncate: false,
                         allowActions: !activeReportNotificationId,
-                        menuMode: activeReportNotificationId ? 'report' : 'standard'
+                        menuMode: activeReportNotificationId ? 'report' : 'standard',
+                        reportNotificationId: activeReportNotificationId
                     });
                     container.appendChild(card);
 
@@ -2128,6 +2214,10 @@ $userId = $_SESSION['user_id'] ?? null;
                 await fetch('bulletin_api.php', { method: 'POST', body: formData });
             }
 
+            if (notif.DaDoc == 0) {
+                adjustNotificationBadge(-1);
+            }
+
             if (notif.MaBD) {
                 await openPostDetail(notif.MaBD);
             }
@@ -2143,6 +2233,10 @@ $userId = $_SESSION['user_id'] ?? null;
                 formData.append('action', 'mark_notification_read');
                 formData.append('maTB', notif.MaTB);
                 await fetch('bulletin_api.php', { method: 'POST', body: formData });
+            }
+
+            if (notif.DaDoc == 0) {
+                adjustNotificationBadge(-1);
             }
 
             if (notif.MaBD) {
@@ -2248,6 +2342,37 @@ $userId = $_SESSION['user_id'] ?? null;
             }
         }
 
+        function updatePostCommentCount(maBD, count) {
+            document.querySelectorAll(`[data-post-comment-count="${maBD}"]`).forEach(el => {
+                el.textContent = count;
+            });
+        }
+
+        function updateFollowState(maBD, isFollowing) {
+            document.querySelectorAll(`[data-post-follow-btn="${maBD}"]`).forEach(el => {
+                el.classList.toggle('active', isFollowing);
+                el.dataset.following = isFollowing ? 'true' : 'false';
+                const label = el.querySelector('span');
+                if (label) {
+                    label.textContent = isFollowing ? 'Đang theo dõi' : 'Theo dõi';
+                }
+            });
+        }
+
+        function adjustNotificationBadge(delta) {
+            const badge = document.getElementById('notifBadge');
+            if (!badge) return;
+            const current = Number(badge.textContent || 0);
+            const next = Math.max(0, current + delta);
+            if (next > 0) {
+                badge.style.display = 'flex';
+                badge.textContent = next;
+            } else {
+                badge.style.display = 'none';
+                badge.textContent = '0';
+            }
+        }
+
         function toggleNotificationTab(tab) {
             const generalList = document.getElementById('notifList');
             const reportList = document.getElementById('reportNotifList');
@@ -2297,7 +2422,10 @@ $userId = $_SESSION['user_id'] ?? null;
         }
 
         async function handleDeleteReport() {
-            if (!activeReportNotificationId) return;
+            if (!activeReportNotificationId) {
+                alert('Không tìm thấy báo cáo để xóa.');
+                return;
+            }
             if (!confirm('Bạn có chắc chắn muốn xóa báo cáo này?')) return;
 
             const formData = new FormData();
@@ -2354,6 +2482,15 @@ $userId = $_SESSION['user_id'] ?? null;
         function escapeHtmlAttribute(unsafe) {
             if (!unsafe) return '';
             return escapeHtml(unsafe).replace(/\n/g, '&#10;');
+        }
+
+        function getInitialsFromName(name) {
+            if (!name) return '';
+            const parts = name.trim().split(/\s+/).filter(Boolean);
+            if (!parts.length) return '';
+            const first = parts[0].charAt(0);
+            const last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
+            return (first + (last && last !== first ? last : '')).toUpperCase();
         }
     </script>
 </body>

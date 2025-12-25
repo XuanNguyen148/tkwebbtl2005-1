@@ -552,7 +552,7 @@ try {
 
             $maTB = intval($_POST['maTB'] ?? 0);
             if ($maTB <= 0) {
-                echo json_encode(['success' => false, 'message' => 'Thiếu thông tin báo cáo']);
+                echo json_encode(['success' => false, 'message' => 'Không tìm thấy báo cáo']);
                 exit();
             }
 
@@ -560,6 +560,11 @@ try {
                 DELETE FROM THONGBAO WHERE MaTB=? AND MaTK=? AND LoaiThongBao='BaoCaoBaiDang'
             ");
             $stmtDelete->execute([$maTB, $userId]);
+
+            if ($stmtDelete->rowCount() === 0) {
+                echo json_encode(['success' => false, 'message' => 'Không tìm thấy báo cáo']);
+                exit();
+            }
 
             echo json_encode(['success' => true, 'message' => 'Đã xóa báo cáo']);
             break;
