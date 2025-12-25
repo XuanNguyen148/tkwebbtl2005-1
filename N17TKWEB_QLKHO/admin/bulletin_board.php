@@ -2466,6 +2466,9 @@ $userInitials = getInitialsFromName($userName);
             const formData = new FormData();
             formData.append('action', 'delete_report_notification');
             formData.append('maTB', reportId);
+            if (activePostActionId) {
+                formData.append('maBD', activePostActionId);
+            }
 
             try {
                 const response = await fetch('bulletin_api.php', {

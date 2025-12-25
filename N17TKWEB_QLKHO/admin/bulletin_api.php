@@ -551,6 +551,7 @@ try {
             }
 
             $maTB = intval($_POST['maTB'] ?? 0);
+            $maBD = intval($_POST['maBD'] ?? 0);
             if ($maTB <= 0) {
                 echo json_encode(['success' => false, 'message' => 'Không tìm thấy báo cáo']);
                 exit();
@@ -561,7 +562,16 @@ try {
             ");
             $stmtDelete->execute([$maTB, $userId]);
 
-            if ($stmtDelete->rowCount() === 0) {
+            if ($stmtDelete->rowCount() === 0 && $maBD > 0) {
+                $stmtDeleteByPost = $pdo->prepare("
+                    DELETE FROM THONGBAO WHERE MaBD=? AND MaTK=? AND LoaiThongBao='BaoCaoBaiDang'
+                ");
+                $stmtDeleteByPost->execute([$maBD, $userId]);
+                if ($stmtDeleteByPost->rowCount() === 0) {
+                    echo json_encode(['success' => false, 'message' => 'Không tìm thấy báo cáo']);
+                    exit();
+                }
+            } elseif ($stmtDelete->rowCount() === 0) {
                 echo json_encode(['success' => false, 'message' => 'Không tìm thấy báo cáo']);
                 exit();
             }
