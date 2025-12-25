@@ -1655,6 +1655,7 @@ $userInitials = getInitialsFromName($userName);
             const menuMode = options.menuMode || 'standard';
             const allowActions = options.allowActions !== false;
             const reportNotificationId = options.reportNotificationId || null;
+            const hideCommentAction = options.hideCommentAction === true;
             const card = document.createElement('div');
             const isHidden = post.TrangThai === 'Ẩn';
             card.className = `post-card${isHidden ? ' hidden-post' : ''}`;
@@ -1682,6 +1683,34 @@ $userInitials = getInitialsFromName($userName);
             const shortContent = hasLongContent ? `${escapeHtml(originalContent.slice(0, MAX_POST_LENGTH))}...` : fullContent;
             const followLabel = post.DangTheoDoi ? 'Đang theo dõi' : 'Theo dõi';
             
+            const commentAction = hideCommentAction ? '' : `
+                        <button class="action-btn" onclick="toggleComments(${post.MaBD})">
+                            <i class="fas fa-comment"></i>
+                            <span>Bình luận</span>
+                        </button>
+                    `;
+            const actionButtons = allowActions ? `
+                    <div class="post-actions">
+                        <button class="action-btn ${post.DaThichBD ? 'active' : ''}" data-post-like-btn="${post.MaBD}" onclick="toggleReaction('BaiDang', ${post.MaBD})">
+                            <i class="fas fa-heart"></i>
+                            <span>Thích</span>
+                        </button>
+                        ${commentAction}
+                        <button class="action-btn">
+                            <i class="fas fa-share"></i>
+                            <span>Chia sẻ</span>
+                        </button>
+                        <button class="action-btn ${post.DangTheoDoi ? 'active' : ''}" data-post-follow-btn="${post.MaBD}" data-following="${post.DangTheoDoi ? 'true' : 'false'}" onclick="toggleFollow(${post.MaBD})">
+                            <i class="fas fa-bell"></i>
+                            <span>${followLabel}</span>
+                        </button>
+                    </div>
+                ` : (commentAction ? `
+                    <div class="post-actions">
+                        ${commentAction}
+                    </div>
+                ` : '');
+
             card.innerHTML = `
                 <div class="post-header">
                     <div class="post-author">
@@ -1725,33 +1754,7 @@ $userInitials = getInitialsFromName($userName);
                     <span><i class="fas fa-comment"></i> <span data-post-comment-count="${post.MaBD}">${post.LuotBinhLuan}</span> bình luận</span>
                 </div>
                 
-                ${allowActions ? `
-                    <div class="post-actions">
-                        <button class="action-btn ${post.DaThichBD ? 'active' : ''}" data-post-like-btn="${post.MaBD}" onclick="toggleReaction('BaiDang', ${post.MaBD})">
-                            <i class="fas fa-heart"></i>
-                            <span>Thích</span>
-                        </button>
-                        <button class="action-btn" onclick="toggleComments(${post.MaBD})">
-                            <i class="fas fa-comment"></i>
-                            <span>Bình luận</span>
-                        </button>
-                        <button class="action-btn">
-                            <i class="fas fa-share"></i>
-                            <span>Chia sẻ</span>
-                        </button>
-                        <button class="action-btn ${post.DangTheoDoi ? 'active' : ''}" data-post-follow-btn="${post.MaBD}" data-following="${post.DangTheoDoi ? 'true' : 'false'}" onclick="toggleFollow(${post.MaBD})">
-                            <i class="fas fa-bell"></i>
-                            <span>${followLabel}</span>
-                        </button>
-                    </div>
-                ` : `
-                    <div class="post-actions">
-                        <button class="action-btn" onclick="toggleComments(${post.MaBD})">
-                            <i class="fas fa-comment"></i>
-                            <span>Bình luận</span>
-                        </button>
-                    </div>
-                `}
+                ${actionButtons}
                 
                 <div class="comments-section" id="comments-${post.MaBD}" style="display:none;">
                     <div class="comments-list"></div>
@@ -2066,7 +2069,7 @@ $userInitials = getInitialsFromName($userName);
         }
 
         // ==================== POST DETAIL ====================
-        async function openPostDetail(maBD) {
+        async function openPostDetail(maBD, options = {}) {
             try {
                 const response = await fetch(`bulletin_api.php?action=get_post_detail&maBD=${maBD}`);
                 const result = await response.json();
@@ -2078,7 +2081,8 @@ $userInitials = getInitialsFromName($userName);
                         allowTruncate: false,
                         allowActions: !activeReportNotificationId,
                         menuMode: activeReportNotificationId ? 'report' : 'standard',
-                        reportNotificationId: activeReportNotificationId
+                        reportNotificationId: activeReportNotificationId,
+                        hideCommentAction: options.hideCommentAction === true
                     });
                     container.appendChild(card);
 
@@ -2219,7 +2223,7 @@ $userInitials = getInitialsFromName($userName);
             }
 
             if (notif.MaBD) {
-                await openPostDetail(notif.MaBD);
+                await openPostDetail(notif.MaBD, { hideCommentAction: true });
             }
 
             document.getElementById('notificationsDropdown').classList.remove('show');
@@ -2240,7 +2244,7 @@ $userInitials = getInitialsFromName($userName);
             }
 
             if (notif.MaBD) {
-                await openPostDetail(notif.MaBD);
+                await openPostDetail(notif.MaBD, { hideCommentAction: true });
             }
 
             document.getElementById('notificationsDropdown').classList.remove('show');
