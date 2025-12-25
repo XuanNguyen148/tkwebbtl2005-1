@@ -429,7 +429,7 @@ CREATE TABLE `theodoi_baidang` (
 CREATE TABLE `thongbao` (
   `MaTB` int(11) NOT NULL,
   `MaTK` char(7) NOT NULL COMMENT 'Người nhận thông báo',
-  `LoaiThongBao` enum('BinhLuanBaiTheoDoi','BinhLuanBaiCuaBan','BaiHot') NOT NULL,
+  `LoaiThongBao` enum('BinhLuanBaiTheoDoi','BinhLuanBaiCuaBan','BaiHot','BaiDangCongTy','BaoCaoBaiDang') NOT NULL,
   `MaBD` int(11) NOT NULL,
   `MaBL` int(11) DEFAULT NULL COMMENT 'Nếu là thông báo bình luận',
   `NguoiTacDong` char(7) DEFAULT NULL COMMENT 'Người gây ra thông báo (bình luận, ...)',
