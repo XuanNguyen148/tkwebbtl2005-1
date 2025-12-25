@@ -1362,6 +1362,7 @@ $userId = $_SESSION['user_id'] ?? null;
         const MAX_POST_LENGTH = 280;
         // Giữ trạng thái phần bình luận đang mở để không bị thu gọn khi reload
         let openComments = new Set();
+        let expandedPosts = new Set();
 
         // ==================== INIT ====================
         document.addEventListener('DOMContentLoaded', function() {
@@ -1602,8 +1603,10 @@ $userId = $_SESSION['user_id'] ?? null;
 
             const originalContent = post.NoiDung || '';
             const fullContent = escapeHtml(originalContent);
-            const shouldTruncate = allowTruncate && originalContent.length > MAX_POST_LENGTH;
-            const shortContent = shouldTruncate ? `${escapeHtml(originalContent.slice(0, MAX_POST_LENGTH))}...` : fullContent;
+            const isExpanded = expandedPosts.has(post.MaBD);
+            const hasLongContent = originalContent.length > MAX_POST_LENGTH;
+            const shouldTruncate = allowTruncate && hasLongContent && !isExpanded;
+            const shortContent = hasLongContent ? `${escapeHtml(originalContent.slice(0, MAX_POST_LENGTH))}...` : fullContent;
             
             card.innerHTML = `
                 <div class="post-header">
@@ -1622,8 +1625,8 @@ $userId = $_SESSION['user_id'] ?? null;
                 </div>
                 
                 <div class="post-content ${shouldTruncate ? 'truncated' : ''}" data-post-id="${post.MaBD}" data-short-content="${escapeHtmlAttribute(shortContent)}" data-full-content="${escapeHtmlAttribute(fullContent)}" data-expanded="${shouldTruncate ? 'false' : 'true'}">${shouldTruncate ? shortContent : fullContent}</div>
-                ${shouldTruncate ? `
-                    <button class="post-read-more" data-read-more="${post.MaBD}" onclick="togglePostContent(${post.MaBD})">Xem thêm</button>
+                ${allowTruncate && hasLongContent ? `
+                    <button class="post-read-more" data-read-more="${post.MaBD}" onclick="togglePostContent(${post.MaBD})">${shouldTruncate ? 'Xem thêm' : 'Thu gọn'}</button>
                 ` : ''}
                 
                 ${post.FileDinhKem && post.FileDinhKem.length > 0 ? `
@@ -2084,7 +2087,7 @@ $userId = $_SESSION['user_id'] ?? null;
                     }
 
                     const badge = document.getElementById('notifBadge');
-                    const totalUnread = result.unreadCount + (reportResult ? reportResult.unreadCount : 0);
+                    const totalUnread = Number(result.unreadCount || 0) + Number(reportResult ? reportResult.unreadCount : 0);
                     if (totalUnread > 0) {
                         badge.style.display = 'flex';
                         badge.textContent = totalUnread;
@@ -2219,6 +2222,12 @@ $userId = $_SESSION['user_id'] ?? null;
             content.innerHTML = isExpanded ? content.dataset.shortContent : content.dataset.fullContent;
             content.classList.toggle('truncated', isExpanded);
             button.textContent = isExpanded ? 'Xem thêm' : 'Thu gọn';
+
+            if (isExpanded) {
+                expandedPosts.delete(maBD);
+            } else {
+                expandedPosts.add(maBD);
+            }
         }
 
         function updateReactionDisplay(loaiDoiTuong, maDoiTuong, count, action) {
