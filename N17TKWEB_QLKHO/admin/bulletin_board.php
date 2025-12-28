@@ -2077,6 +2077,12 @@ $userInitials = getInitialsFromName($userName);
             const shouldTruncate = allowTruncate && hasLongContent && !isExpanded;
             const shortContent = hasLongContent ? `${escapeHtml(originalContent.slice(0, MAX_POST_LENGTH))}...` : fullContent;
             const followLabel = post.DangTheoDoi ? 'Đang theo dõi' : 'Theo dõi';
+            const forceAnonymousComment = post.DanhTinh === 'Ẩn danh' && String(post.MaTK) === String(currentUserId);
+            const commentIdentityDisabled = forceAnonymousComment ? 'disabled' : '';
+            const commentIdentityValue = forceAnonymousComment ? 'Ẩn danh' : 'Hữu danh';
+            const commentIdentityHelp = forceAnonymousComment
+                ? '<div style="font-size:11px;color:var(--text-light);margin-top:4px;">Bài đăng ẩn danh: bạn chỉ có thể bình luận ẩn danh.</div>'
+                : '';
             
             const commentAction = hideCommentAction ? '' : `
                         <button class="action-btn" onclick="toggleComments(${post.MaBD})">
@@ -2162,14 +2168,15 @@ $userInitials = getInitialsFromName($userName);
                     <div class="comment-input-wrapper">
                         <input type="text" class="comment-input" placeholder="Viết bình luận..." 
                                onkeypress="if(event.key==='Enter') submitComment(${post.MaBD}, this.value, this, this.parentElement.querySelector('.comment-identity').value)">
-                        <select class="comment-identity" aria-label="Danh tính bình luận">
-                            <option value="Hữu danh">Hữu danh</option>
-                            <option value="Ẩn danh">Ẩn danh</option>
+                        <select class="comment-identity" aria-label="Danh tính bình luận" ${commentIdentityDisabled}>
+                            <option value="Hữu danh" ${commentIdentityValue === 'Hữu danh' ? 'selected' : ''}>Hữu danh</option>
+                            <option value="Ẩn danh" ${commentIdentityValue === 'Ẩn danh' ? 'selected' : ''}>Ẩn danh</option>
                         </select>
                         <button class="comment-submit-btn" onclick="submitComment(${post.MaBD}, this.previousElementSibling.previousElementSibling.value, this.previousElementSibling.previousElementSibling, this.previousElementSibling.value)">
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
+                    ${commentIdentityHelp}
                 </div>
             `;
 

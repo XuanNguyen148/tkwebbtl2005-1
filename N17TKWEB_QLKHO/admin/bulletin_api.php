@@ -264,7 +264,17 @@ try {
                 echo json_encode(['success' => false, 'message' => 'Vui lòng nhập nội dung bình luận']);
                 exit();
             }
-            
+
+            $stmtPostInfo = $pdo->prepare("
+                SELECT MaTK, DanhTinh FROM BAIDANG WHERE MaBD=?
+            ");
+            $stmtPostInfo->execute([$maBD]);
+            $postInfo = $stmtPostInfo->fetch(PDO::FETCH_ASSOC);
+            if (!$postInfo) {
+                echo json_encode(['success' => false, 'message' => 'Không tìm thấy bài đăng']);
+                exit();
+            }
+
             // Xử lý file đính kèm
             $fileDinhKem = [];
             if (!empty($_FILES['files']['name'][0])) {
@@ -289,7 +299,19 @@ try {
                 }
             }
             
-            $tenNguoiBinhLuan = ($danhTinh === 'Ẩn danh') ? 'Ẩn danh' : $userName;
+            if ($postInfo['MaTK'] === $userId && $postInfo['DanhTinh'] === 'Ẩn danh') {
+                $danhTinh = 'Ẩn danh';
+            }
+
+            if ($danhTinh === 'Ẩn danh') {
+                if ($postInfo['MaTK'] === $userId && $postInfo['DanhTinh'] === 'Ẩn danh') {
+                    $tenNguoiBinhLuan = 'Ẩn danh';
+                } else {
+                    $tenNguoiBinhLuan = generateAnonymousLabel($pdo, $maBD);
+                }
+            } else {
+                $tenNguoiBinhLuan = $userName;
+            }
             $stmt = $pdo->prepare("
                 INSERT INTO BINHLUAN (MaBD, MaTK, TenNguoiBinhLuan, NoiDung, FileDinhKem)
                 VALUES (?, ?, ?, ?, ?)
@@ -871,6 +893,18 @@ try {
     }
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => 'Lỗi: ' . $e->getMessage()]);
+}
+
+function generateAnonymousLabel($pdo, $maBD) {
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) as total
+        FROM BINHLUAN
+        WHERE MaBD=? AND TenNguoiBinhLuan LIKE 'Ẩn danh %' AND TenNguoiBinhLuan != 'Ẩn danh'
+    ");
+    $stmt->execute([$maBD]);
+    $count = intval($stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+    $nextNumber = min($count + 1, 999);
+    return 'Ẩn danh ' . str_pad((string)$nextNumber, 3, '0', STR_PAD_LEFT);
 }
 
 // Hàm tạo thông báo khi có bình luận mới
