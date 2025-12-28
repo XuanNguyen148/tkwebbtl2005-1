@@ -132,6 +132,10 @@ try {
                 case 'hot':
                     $where .= " AND (bd.LuotCamXuc >= 3 OR bd.LuotBinhLuan >= 3)";
                     break;
+                case 'following':
+                    $where .= " AND EXISTS (SELECT 1 FROM THEODOI_BAIDANG tdb WHERE tdb.MaBD = bd.MaBD AND tdb.MaTK = ?)";
+                    $filterParams[] = $userId;
+                    break;
                 case 'company':
                     $where .= " AND bd.PhanLoai = 'Bảng tin công ty'";
                     break;

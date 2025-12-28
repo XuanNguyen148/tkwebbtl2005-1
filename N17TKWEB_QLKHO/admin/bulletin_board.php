@@ -1493,6 +1493,9 @@ $userInitials = getInitialsFromName($userName);
                         <button class="tab-btn" data-filter="hot">
                             <i class="fas fa-fire"></i> Hot
                         </button>
+                        <button class="tab-btn" data-filter="following">
+                            <i class="fas fa-star"></i> Đang theo dõi
+                        </button>
                         <button class="tab-btn" data-filter="mine">Bài viết của tôi</button>
                         <button class="tab-btn" data-filter="company">Bảng tin công ty</button>
                         <button class="tab-btn" data-filter="forum">Diễn đàn nhân viên</button>
