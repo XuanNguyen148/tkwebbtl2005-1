@@ -12,6 +12,28 @@ $userName = $_SESSION['username'] ?? 'Người dùng';
 $userRole = $_SESSION['role'] ?? 'Nhân viên';
 $userId = $_SESSION['user_id'] ?? null;
 
+function isManagerRole($role) {
+    $role = trim($role ?? '');
+    if ($role === '') {
+        return false;
+    }
+    $lower = mb_strtolower($role, 'UTF-8');
+    $lower = preg_replace('/\s+/u', ' ', $lower);
+    if ($lower === 'quản lý') {
+        return true;
+    }
+    $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $lower);
+    if ($ascii !== false) {
+        $ascii = preg_replace('/\s+/', ' ', trim(strtolower($ascii)));
+        if ($ascii === 'quan ly') {
+            return true;
+        }
+    }
+    return false;
+}
+
+$isManager = isManagerRole($userRole);
+
 function getInitialsFromName($name) {
     $name = trim($name ?? '');
     if ($name === '') {
@@ -186,6 +208,107 @@ $userInitials = getInitialsFromName($userName);
             display: flex;
             align-items: center;
             gap: 6px;
+        }
+
+        .author-hover {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .author-tooltip {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            min-width: 260px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 12px 28px rgba(0,0,0,0.12);
+            padding: 12px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-6px);
+            transition: all 0.2s ease;
+            z-index: 2000;
+        }
+
+        .author-hover:hover .author-tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .author-tooltip-header {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .author-tooltip-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 700;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .author-tooltip-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 13px;
+            color: var(--text);
+        }
+
+        .author-tooltip-name {
+            font-weight: 700;
+            color: var(--dark);
+            font-size: 14px;
+        }
+
+        .author-tooltip-actions {
+            display: grid;
+            gap: 8px;
+        }
+
+        .author-action-btn {
+            border: 1px solid #e5e7eb;
+            background: #f8fafc;
+            color: var(--dark);
+            padding: 8px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: left;
+            transition: all 0.2s;
+        }
+
+        .author-action-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #eef4ff;
+        }
+
+        .author-action-btn.danger {
+            border-color: #fecaca;
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .author-action-btn.danger:hover {
+            border-color: #ef4444;
+            background: #fee2e2;
+            color: #b91c1c;
         }
 
         .post-time {
@@ -869,6 +992,65 @@ $userInitials = getInitialsFromName($userName);
             background: #f0f0f0;
         }
 
+        /* More (three-dot) button on notification items */
+        .notif-more-btn {
+            background: transparent;
+            border: none;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            color: var(--text-light);
+            padding: 6px 8px;
+            border-radius: 6px;
+        }
+
+        .notif-more-btn:hover {
+            background: #f0f0f0;
+            color: var(--dark);
+        }
+
+        .notif-content.notif-content-report {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .report-notif-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .notif-content.notif-content-report .notif-more-btn {
+            margin-left: auto;
+        }
+
+        /* Small popup menu for notification item actions */
+        .notif-item-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #e6e6e6;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            border-radius: 8px;
+            z-index: 20000;
+            min-width: 140px;
+            overflow: hidden;
+        }
+
+        .notif-item-menu button {
+            display: block;
+            width: 100%;
+            padding: 10px 12px;
+            border: none;
+            background: none;
+            text-align: left;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .notif-item-menu button:hover {
+            background: #f8fafc;
+        }
+
         .notif-tabs {
             display: flex;
             gap: 8px;
@@ -1110,6 +1292,7 @@ $userInitials = getInitialsFromName($userName);
             background: #eef4ff;
         }
 
+
         /* Loading spinner */
         .loading {
             text-align: center;
@@ -1226,7 +1409,7 @@ $userInitials = getInitialsFromName($userName);
                             </button>
                         </div>
                     </div>
-                    <?php if ($userRole === 'Quản lý'): ?>
+                    <?php if ($isManager): ?>
                     <div class="notif-tabs">
                         <button class="tab-btn active" data-notif-tab="general">Thông báo</button>
                         <button class="tab-btn" data-notif-tab="reports">Báo cáo</button>
@@ -1238,7 +1421,7 @@ $userInitials = getInitialsFromName($userName);
                             <p>Đang tải thông báo...</p>
                         </div>
                     </div>
-                    <?php if ($userRole === 'Quản lý'): ?>
+                    <?php if ($isManager): ?>
                     <div class="notif-list" id="reportNotifList" style="display: none;">
                         <div class="loading">
                             <div class="spinner"></div>
@@ -1307,7 +1490,7 @@ $userInitials = getInitialsFromName($userName);
                             <div class="form-group">
                                 <label>Phân loại</label>
                                 <select name="phanLoai" id="postCategory">
-                                    <?php if ($userRole === 'Quản lý'): ?>
+                                    <?php if ($isManager): ?>
                                     <option value="Bảng tin công ty">Bảng tin công ty</option>
                                     <?php endif; ?>
                                     <option value="Diễn đàn nhân viên" selected>Diễn đàn nhân viên</option>
@@ -1325,14 +1508,14 @@ $userInitials = getInitialsFromName($userName);
                         </div>
 
                         <div class="form-group">
-                            <label>File đính kèm (ảnh, video, tài liệu)</label>
+                            <label>File đính kèm</label>
                             <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
                                 <i class="fas fa-cloud-upload-alt"></i>
-                                <p>Nhấp để chọn file hoặc kéo thả file vào đây</p>
-                                <p style="font-size: 12px; margin-top: 5px;">Hỗ trợ: Ảnh, Video, PDF, Word, Excel</p>
+                                <p>Nhấp để chọn file</p>
+                                <p style="font-size: 12px; margin-top: 5px;">Hỗ trợ: Ảnh, PDF, Word, Excel</p>
                             </div>
                             <input type="file" id="fileInput" name="files[]" class="file-input" 
-                                   multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx">
+                                   multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
                             <div class="selected-files" id="selectedFiles"></div>
                         </div>
 
@@ -1417,8 +1600,11 @@ $userInitials = getInitialsFromName($userName);
         let activePostActionMode = 'standard';
         let activePostCanEdit = false;
         let activeReportNotificationId = null;
-        const isManager = <?php echo ($userRole === 'Quản lý') ? 'true' : 'false'; ?>;
-        const MAX_POST_LENGTH = 280;
+        let activeNotifItemMenu = null;
+        const isManager = <?php echo $isManager ? 'true' : 'false'; ?>;
+        const currentUserId = <?php echo json_encode($userId); ?>;
+        const currentUserName = <?php echo json_encode($userName); ?>;
+        const MAX_POST_LENGTH = 600;
         const MAX_COMMENT_LENGTH = 200;
         // Giữ trạng thái phần bình luận đang mở để không bị thu gọn khi reload
         let openComments = new Set();
@@ -1485,11 +1671,12 @@ $userInitials = getInitialsFromName($userName);
                 }
             });
 
-            document.getElementById('reportModal').addEventListener('click', function(e) {
-                if (e.target === this) {
-                    closeReportModal();
-                }
-            });
+        document.getElementById('reportModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeReportModal();
+            }
+        });
+
 
             document.addEventListener('click', function(event) {
                 const dropdown = document.getElementById('notificationsDropdown');
@@ -1502,6 +1689,10 @@ $userInitials = getInitialsFromName($userName);
 
                 if (settingsMenu.classList.contains('show') && !settingsMenu.contains(event.target)) {
                     settingsMenu.classList.remove('show');
+                }
+
+                if (activeNotifItemMenu && !activeNotifItemMenu.contains(event.target) && !event.target.closest('.notif-more-btn')) {
+                    closeNotifItemMenu();
                 }
             });
         }
@@ -1677,7 +1868,30 @@ $userInitials = getInitialsFromName($userName);
             // Author initials
             const initials = getInitialsFromName(post.TenNguoiDang);
             const showManagerBadge = post.VaiTro === 'Quản lý' && post.DanhTinh !== 'Ẩn danh';
-            const managerBadge = showManagerBadge ? '<span class="role-badge">QL</span>' : '';
+            const managerBadge = showManagerBadge ? '<span class="role-badge">Admin</span>' : '';
+            const authorFullName = post.TenTaiKhoan || post.TenNguoiDang || '';
+            const authorTooltipInitials = getInitialsFromName(authorFullName || post.TenNguoiDang);
+            const authorFullNameLabel = authorFullName ? escapeHtml(authorFullName) : '-';
+            const authorRoleLabel = post.VaiTro ? escapeHtml(post.VaiTro) : '-';
+            const authorUserId = post.MaTK || ((currentUserName && (post.TenTaiKhoan === currentUserName || post.TenNguoiDang === currentUserName)) ? currentUserId : null);
+            const authorIdLabel = authorUserId ? escapeHtml(authorUserId) : '-';
+            const canShowAuthorActions = isManager && authorUserId;
+            const authorTooltip = canShowAuthorActions ? `
+                    <div class="author-tooltip">
+                        <div class="author-tooltip-header">
+                            <div class="author-tooltip-avatar">${authorTooltipInitials}</div>
+                            <div class="author-tooltip-info">
+                                <div class="author-tooltip-name">${authorFullNameLabel}</div>
+                                <div>M&#227; nh&#226;n vi&#234;n: ${authorIdLabel}</div>
+                                <div>Vai tr&#242;: ${authorRoleLabel}</div>
+                            </div>
+                        </div>
+                        <div class="author-tooltip-actions">
+                            <button type="button" class="author-action-btn" data-action="delete-posts" data-user-id="${escapeHtmlAttribute(authorUserId)}">X&#243;a to&#224;n b&#7897; b&#224;i vi&#7871;t</button>
+                            <button type="button" class="author-action-btn danger" data-action="delete-user" data-user-id="${escapeHtmlAttribute(authorUserId)}">X&#243;a t&#224;i kho&#7843;n</button>
+                        </div>
+                    </div>
+                ` : '';
             
             // Time ago
             const timeAgo = getTimeAgo(post.ThoiGianDang);
@@ -1723,7 +1937,13 @@ $userInitials = getInitialsFromName($userName);
                     <div class="post-author">
                         <div class="author-avatar">${initials}</div>
                         <div class="author-info">
-                            <div class="author-name">${escapeHtml(post.TenNguoiDang)} ${managerBadge}</div>
+                            <div class="author-name">
+                                <span class="author-hover">
+                                    <span class="author-display">${escapeHtml(post.TenNguoiDang)}</span>
+                                    ${managerBadge}
+                                    ${authorTooltip}
+                                </span>
+                            </div>
                             <div class="post-time">${timeAgo}</div>
                             <span class="post-category ${categoryClass}">${post.PhanLoai}</span>
                             ${isHidden ? '<span class="post-status-badge"><i class="fas fa-eye-slash"></i> Đang ẩn</span>' : ''}
@@ -1774,6 +1994,22 @@ $userInitials = getInitialsFromName($userName);
                     </div>
                 </div>
             `;
+
+            if (canShowAuthorActions) {
+                card.querySelectorAll('.author-action-btn').forEach(btn => {
+                    btn.addEventListener('click', async (event) => {
+                        event.stopPropagation();
+                        const action = btn.dataset.action;
+                        const userId = btn.dataset.userId;
+                        if (!userId) return;
+                        if (action === 'delete-posts') {
+                            await deleteUserPosts(userId);
+                        } else if (action === 'delete-user') {
+                            await deleteUserAccount(userId);
+                        }
+                    });
+                });
+            }
             
             return card;
         }
@@ -1825,7 +2061,7 @@ $userInitials = getInitialsFromName($userName);
             
             const initials = getInitialsFromName(comment.TenNguoiBinhLuan);
             const timeAgo = getTimeAgo(comment.ThoiGianBinhLuan);
-            const managerBadge = comment.VaiTro === 'Quản lý' ? '<span class="role-badge">QL</span>' : '';
+            const managerBadge = comment.VaiTro === 'Quản lý' ? '<span class="role-badge">Admin</span>' : '';
             
             const originalContent = comment.NoiDung || '';
             const fullContent = escapeHtml(originalContent);
@@ -2153,6 +2389,7 @@ $userInitials = getInitialsFromName($userName);
 
         // ==================== NOTIFICATIONS ====================
         async function loadNotifications() {
+            closeNotifItemMenu();
             try {
                 const requests = [fetch('bulletin_api.php?action=get_notifications')];
                 if (isManager) {
@@ -2194,11 +2431,18 @@ $userInitials = getInitialsFromName($userName);
                                 const item = document.createElement('div');
                                 item.className = `notif-item ${notif.DaDoc == 0 ? 'unread' : ''}`;
                                 item.innerHTML = `
-                                    <div class="notif-content">${renderReportNotificationText(notif)}</div>
+                                    <div class="notif-content notif-content-report">${renderReportNotificationText(notif)}</div>
                                     <div class="notif-time">${getTimeAgo(notif.ThoiGian)}</div>
                                 `;
-                                    // Pass the clicked element so handler can update UI immediately
-                                    item.addEventListener('click', (e) => handleReportNotificationClick(notif, e.currentTarget || item));
+                                const moreBtn = item.querySelector('.notif-more-btn');
+                                if (moreBtn) {
+                                    moreBtn.addEventListener('click', (event) => {
+                                        event.stopPropagation();
+                                        openNotifItemMenu(moreBtn, notif.MaTB);
+                                    });
+                                }
+                                // Pass the clicked element so handler can update UI immediately
+                                item.addEventListener('click', (e) => handleReportNotificationClick(notif, e.currentTarget || item));
                                 reportList.appendChild(item);
                             });
                         }
@@ -2234,10 +2478,12 @@ $userInitials = getInitialsFromName($userName);
         }
 
         function renderReportNotificationText(notif) {
-            return `Báo cáo từ <strong>${escapeHtml(notif.TenNguoiTacDong || '')}</strong>: ${escapeHtml(notif.NoiDungRutGon || '')}`;
+            // Include a three-dot action button for per-report actions
+            return `<span class="report-notif-text">B&#225;o c&#225;o t&#7915; <strong>${escapeHtml(notif.TenNguoiTacDong || '')}</strong>: ${escapeHtml(notif.NoiDungRutGon || '')}</span><button type="button" class="notif-more-btn" data-report-id="${notif.MaTB}" aria-label="T&#249;y ch&#7885;n">&#8942;</button>`;
         }
 
         async function handleNotificationClick(notif) {
+            closeNotifItemMenu();
             activeReportNotificationId = null;
 
             if (notif.MaBD) {
@@ -2249,6 +2495,7 @@ $userInitials = getInitialsFromName($userName);
         }
 
         async function handleReportNotificationClick(notif) {
+            closeNotifItemMenu();
             activeReportNotificationId = notif.MaTB;
 
             if (notif.MaBD) {
@@ -2267,12 +2514,60 @@ $userInitials = getInitialsFromName($userName);
             dropdown.classList.toggle('show');
             if (dropdown.classList.contains('show')) {
                 loadNotifications();
+            } else {
+                closeNotifItemMenu();
             }
         }
 
         function toggleNotifSettings(event) {
             event.stopPropagation();
             document.getElementById('notifSettingsMenu').classList.toggle('show');
+        }
+
+        function closeNotifItemMenu() {
+            if (activeNotifItemMenu) {
+                activeNotifItemMenu.remove();
+                activeNotifItemMenu = null;
+            }
+        }
+
+        function openNotifItemMenu(button, reportId) {
+            closeNotifItemMenu();
+            if (!button || !reportId) return;
+
+            const menu = document.createElement('div');
+            menu.className = 'notif-item-menu';
+            menu.innerHTML = `<button type="button" data-report-action="delete">X&#243;a b&#225;o c&#225;o</button>`;
+            menu.addEventListener('click', (event) => event.stopPropagation());
+
+            document.body.appendChild(menu);
+
+            const rect = button.getBoundingClientRect();
+            const menuRect = menu.getBoundingClientRect();
+            const padding = 10;
+            let top = rect.bottom + window.scrollY + 6;
+            const maxTop = window.scrollY + window.innerHeight - menuRect.height - padding;
+            if (top > maxTop) {
+                top = rect.top + window.scrollY - menuRect.height - 6;
+            }
+            let left = rect.right + window.scrollX - menuRect.width;
+            const minLeft = window.scrollX + padding;
+            const maxLeft = window.scrollX + window.innerWidth - menuRect.width - padding;
+            left = Math.min(Math.max(left, minLeft), maxLeft);
+
+            menu.style.top = `${top}px`;
+            menu.style.left = `${left}px`;
+
+            const deleteBtn = menu.querySelector('[data-report-action="delete"]');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', async (event) => {
+                    event.stopPropagation();
+                    closeNotifItemMenu();
+                    await deleteReportNotification(reportId);
+                });
+            }
+
+            activeNotifItemMenu = menu;
         }
 
         async function markAllAsRead() {
@@ -2284,7 +2579,7 @@ $userInitials = getInitialsFromName($userName);
         }
 
         async function deleteAllNotifications() {
-            if (!confirm('Bạn có chắc chắn muốn xóa tất cả thông báo?')) return;
+            if (!confirm('Xác nhận xóa tất cả thông báo')) return;
             const formData = new FormData();
             formData.append('action', 'delete_all_notifications');
 
@@ -2454,9 +2749,7 @@ $userInitials = getInitialsFromName($userName);
             }
         }
 
-        async function handleDeleteReport() {
-            const modalReportId = document.getElementById('postDetailModal')?.dataset?.reportNotificationId;
-            const reportId = activeReportNotificationId || (modalReportId ? Number(modalReportId) : null);
+        async function deleteReportNotification(reportId) {
             if (!reportId) {
                 alert('Không tìm thấy báo cáo để xóa.');
                 return;
@@ -2484,6 +2777,67 @@ $userInitials = getInitialsFromName($userName);
             } catch (error) {
                 console.error('Error:', error);
                 alert('Không thể xóa báo cáo');
+            }
+        }
+
+        async function handleDeleteReport() {
+            const modalReportId = document.getElementById('postDetailModal')?.dataset?.reportNotificationId;
+            const reportId = activeReportNotificationId || (modalReportId ? Number(modalReportId) : null);
+            await deleteReportNotification(reportId);
+        }
+
+        async function deleteUserPosts(maTK) {
+            if (!maTK) return;
+            if (!confirm(`Xác nhận xóa toàn bộ bài viết của nhân viên ${maTK}`)) return;
+
+            const formData = new FormData();
+            formData.append('action', 'delete_user_posts');
+            formData.append('maTK', maTK);
+
+            try {
+                const response = await fetch('bulletin_api.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.success) {
+                    const count = Number(result.count || 0);
+                    alert(count > 0 ? `Đã xóa ${count} bài viết.` : 'Không có bài viết để xóa.');
+                    await loadPosts();
+                    await loadNotifications();
+                } else {
+                    alert('Lỗi: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Không thể xóa bài viết.');
+            }
+        }
+
+        async function deleteUserAccount(maTK) {
+            if (!maTK) return;
+            if (!confirm(`Xác nhận xóa tài khoản ${maTK}? Tất cả bài viết và dữ liệu liên quan sẽ bị xóa.`)) return;
+
+            const formData = new FormData();
+            formData.append('action', 'delete_user_account');
+            formData.append('maTK', maTK);
+
+            try {
+                const response = await fetch('bulletin_api.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('Xóa tài khoản thành công.');
+                    await loadPosts();
+                    await loadNotifications();
+                } else {
+                    alert('Lỗi: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Không thể xóa tài khoản.');
             }
         }
 
@@ -2530,3 +2884,4 @@ $userInitials = getInitialsFromName($userName);
     </script>
 </body>
 </html>
+

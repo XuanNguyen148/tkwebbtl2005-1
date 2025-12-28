@@ -16,6 +16,28 @@ $userName = $_SESSION['username'];
 $userRole = $_SESSION['role'];
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
+function isManagerRole($role) {
+    $role = trim($role ?? '');
+    if ($role === '') {
+        return false;
+    }
+    $lower = mb_strtolower($role, 'UTF-8');
+    $lower = preg_replace('/\s+/u', ' ', $lower);
+    if ($lower === 'quản lý') {
+        return true;
+    }
+    $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $lower);
+    if ($ascii !== false) {
+        $ascii = preg_replace('/\s+/', ' ', trim(strtolower($ascii)));
+        if ($ascii === 'quan ly') {
+            return true;
+        }
+    }
+    return false;
+}
+
+$isManager = isManagerRole($userRole);
+
 try {
     switch ($action) {
         // ============ ĐĂNG BÀI ============
@@ -130,6 +152,7 @@ try {
                 SELECT 
                     bd.*,
                     tk.VaiTro,
+                    tk.TenTK as TenTaiKhoan,
                     (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BaiDang' AND MaDoiTuong=bd.MaBD AND MaTK=?) as DaThichBD,
                     (SELECT COUNT(*) FROM THEODOI_BAIDANG WHERE MaBD=bd.MaBD AND MaTK=?) as DangTheoDoi
                 FROM BAIDANG bd
@@ -181,6 +204,7 @@ try {
                 SELECT 
                     bd.*,
                     tk.VaiTro,
+                    tk.TenTK as TenTaiKhoan,
                     (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BaiDang' AND MaDoiTuong=bd.MaBD AND MaTK=?) as DaThichBD,
                     (SELECT COUNT(*) FROM THEODOI_BAIDANG WHERE MaBD=bd.MaBD AND MaTK=?) as DangTheoDoi
                 FROM BAIDANG bd
@@ -412,6 +436,69 @@ try {
             
             echo json_encode(['success' => true, 'message' => 'Đã xóa bài đăng']);
             break;
+
+        // ============ XOA TOAN BO BAI VIET THEO TAI KHOAN ============
+        case 'delete_user_posts':
+            if (!$isManager) {
+                echo json_encode(['success' => false, 'message' => 'Khong co quyen']);
+                exit();
+            }
+
+            $maTK = trim($_POST['maTK'] ?? '');
+            if ($maTK === '') {
+                echo json_encode(['success' => false, 'message' => 'Thieu ma tai khoan']);
+                exit();
+            }
+
+            $stmtCheck = $pdo->prepare("SELECT MaTK FROM TAIKHOAN WHERE MaTK=?");
+            $stmtCheck->execute([$maTK]);
+            $userRow = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+            if (!$userRow) {
+                echo json_encode(['success' => false, 'message' => 'Khong tim thay tai khoan']);
+                exit();
+            }
+
+            $stmtDelete = $pdo->prepare("UPDATE BAIDANG SET TrangThai='Đã xóa' WHERE MaTK=?");
+            $stmtDelete->execute([$maTK]);
+
+            echo json_encode([
+                'success' => true,
+                'count' => $stmtDelete->rowCount()
+            ]);
+            break;
+
+        // ============ XOA TAI KHOAN ============
+        case 'delete_user_account':
+            if (!$isManager) {
+                echo json_encode(['success' => false, 'message' => 'Khong co quyen']);
+                exit();
+            }
+
+            $maTK = trim($_POST['maTK'] ?? '');
+            if ($maTK === '') {
+                echo json_encode(['success' => false, 'message' => 'Thieu ma tai khoan']);
+                exit();
+            }
+
+            if ($maTK === $userId) {
+                echo json_encode(['success' => false, 'message' => 'Khong the xoa tai khoan dang dang nhap']);
+                exit();
+            }
+
+            $stmtCheck = $pdo->prepare("SELECT MaTK FROM TAIKHOAN WHERE MaTK=?");
+            $stmtCheck->execute([$maTK]);
+            $userRow = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+            if (!$userRow) {
+                echo json_encode(['success' => false, 'message' => 'Khong tim thay tai khoan']);
+                exit();
+            }
+
+            $stmtDelete = $pdo->prepare("DELETE FROM TAIKHOAN WHERE MaTK=?");
+            $stmtDelete->execute([$maTK]);
+
+            echo json_encode(['success' => true, 'message' => 'Da xoa tai khoan']);
+            break;
+
             
         // ============ XÓA BÌNH LUẬN ============
         case 'delete_comment':
@@ -526,19 +613,35 @@ try {
                 $noiDungRutGon .= '...';
             }
 
-            $stmtInsert = $pdo->prepare("
-                INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, NguoiTacDong, TenNguoiTacDong, NoiDungRutGon)
-                VALUES (?, 'BaoCaoBaiDang', ?, ?, ?, ?)
-            ");
+            $pdo->beginTransaction();
+            try {
+                $stmtReport = $pdo->prepare("
+                    INSERT INTO BAOCAO_BAIDANG (MaBD, MaTK, LyDo)
+                    VALUES (?, ?, ?)
+                ");
+                $stmtReport->execute([$maBD, $userId, $lyDo]);
+                $maBC = $pdo->lastInsertId();
 
-            foreach ($managers as $manager) {
-                $stmtInsert->execute([
-                    $manager['MaTK'],
-                    $maBD,
-                    $userId,
-                    $userName,
-                    $noiDungRutGon
-                ]);
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO THONGBAO (MaTK, LoaiThongBao, MaBD, MaBC, NguoiTacDong, TenNguoiTacDong, NoiDungRutGon)
+                    VALUES (?, 'BaoCaoBaiDang', ?, ?, ?, ?, ?)
+                ");
+
+                foreach ($managers as $manager) {
+                    $stmtInsert->execute([
+                        $manager['MaTK'],
+                        $maBD,
+                        $maBC,
+                        $userId,
+                        $userName,
+                        $noiDungRutGon
+                    ]);
+                }
+
+                $pdo->commit();
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                throw $e;
             }
 
             echo json_encode(['success' => true, 'message' => 'Đã gửi báo cáo']);
@@ -556,14 +659,40 @@ try {
                 exit();
             }
 
-            $stmtDelete = $pdo->prepare("
-                DELETE FROM THONGBAO WHERE MaTB=? AND LoaiThongBao='BaoCaoBaiDang'
+            $stmtFind = $pdo->prepare("
+                SELECT MaBC FROM THONGBAO WHERE MaTB=? AND LoaiThongBao='BaoCaoBaiDang'
             ");
-            $stmtDelete->execute([$maTB]);
+            $stmtFind->execute([$maTB]);
+            $reportRow = $stmtFind->fetch(PDO::FETCH_ASSOC);
 
-            if ($stmtDelete->rowCount() === 0) {
+            if (!$reportRow) {
                 echo json_encode(['success' => false, 'message' => 'Không tìm thấy báo cáo']);
                 exit();
+            }
+
+            $maBC = $reportRow['MaBC'];
+            $pdo->beginTransaction();
+            try {
+                if (!empty($maBC)) {
+                    $stmtDeleteNotifs = $pdo->prepare("
+                        DELETE FROM THONGBAO WHERE MaBC=? AND LoaiThongBao='BaoCaoBaiDang'
+                    ");
+                    $stmtDeleteNotifs->execute([$maBC]);
+
+                    $stmtDeleteReport = $pdo->prepare("
+                        DELETE FROM BAOCAO_BAIDANG WHERE MaBC=?
+                    ");
+                    $stmtDeleteReport->execute([$maBC]);
+                } else {
+                    $stmtDeleteNotifs = $pdo->prepare("
+                        DELETE FROM THONGBAO WHERE MaTB=? AND LoaiThongBao='BaoCaoBaiDang'
+                    ");
+                    $stmtDeleteNotifs->execute([$maTB]);
+                }
+                $pdo->commit();
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                throw $e;
             }
 
             echo json_encode(['success' => true, 'message' => 'Đã xóa báo cáo']);
@@ -583,15 +712,26 @@ try {
             
         // ============ ĐÁNH DẤU TẤT CẢ ĐÃ ĐỌC ============
         case 'mark_all_read':
-            $stmt = $pdo->prepare("UPDATE THONGBAO SET DaDoc=1 WHERE MaTK=?");
-            $stmt->execute([$userId]);
+            if ($userRole === 'Quản lý') {
+                $stmt = $pdo->prepare("UPDATE THONGBAO SET DaDoc=1 WHERE MaTK=?");
+                $stmt->execute([$userId]);
+            } else {
+                $stmt = $pdo->prepare("
+                    UPDATE THONGBAO SET DaDoc=1
+                    WHERE MaTK=? AND LoaiThongBao!='BaoCaoBaiDang'
+                ");
+                $stmt->execute([$userId]);
+            }
             
             echo json_encode(['success' => true, 'message' => 'Đã đánh dấu tất cả đã đọc']);
             break;
             
         // ============ XÓA TẤT CẢ THÔNG BÁO ============
         case 'delete_all_notifications':
-            $stmt = $pdo->prepare("DELETE FROM THONGBAO WHERE MaTK=?");
+            $stmt = $pdo->prepare("
+                DELETE FROM THONGBAO
+                WHERE MaTK=? AND LoaiThongBao!='BaoCaoBaiDang'
+            ");
             $stmt->execute([$userId]);
             
             echo json_encode(['success' => true, 'message' => 'Đã xóa tất cả thông báo']);
