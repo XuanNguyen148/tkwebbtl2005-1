@@ -307,7 +307,7 @@ try {
                 if ($postInfo['MaTK'] === $userId && $postInfo['DanhTinh'] === 'Ẩn danh') {
                     $tenNguoiBinhLuan = 'Ẩn danh';
                 } else {
-                    $tenNguoiBinhLuan = generateAnonymousLabel($pdo, $maBD);
+                    $tenNguoiBinhLuan = generateAnonymousLabel($pdo, $maBD, $userId);
                 }
             } else {
                 $tenNguoiBinhLuan = $userName;
@@ -895,9 +895,22 @@ try {
     echo json_encode(['success' => false, 'message' => 'Lỗi: ' . $e->getMessage()]);
 }
 
-function generateAnonymousLabel($pdo, $maBD) {
+function generateAnonymousLabel($pdo, $maBD, $maTK) {
+    $stmtExisting = $pdo->prepare("
+        SELECT TenNguoiBinhLuan
+        FROM BINHLUAN
+        WHERE MaBD=? AND MaTK=? AND TenNguoiBinhLuan LIKE 'Ẩn danh %'
+        ORDER BY MaBL ASC
+        LIMIT 1
+    ");
+    $stmtExisting->execute([$maBD, $maTK]);
+    $existing = $stmtExisting->fetch(PDO::FETCH_ASSOC);
+    if ($existing && !empty($existing['TenNguoiBinhLuan'])) {
+        return $existing['TenNguoiBinhLuan'];
+    }
+
     $stmt = $pdo->prepare("
-        SELECT COUNT(*) as total
+        SELECT COUNT(DISTINCT MaTK) as total
         FROM BINHLUAN
         WHERE MaBD=? AND TenNguoiBinhLuan LIKE 'Ẩn danh %' AND TenNguoiBinhLuan != 'Ẩn danh'
     ");
