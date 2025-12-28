@@ -176,7 +176,8 @@ try {
                 $post['DangTheoDoi'] = (bool)$post['DangTheoDoi'];
                 
                 // Kiểm tra quyền sửa/xóa
-                $post['CoTheChinhSua'] = ($post['MaTK'] === $userId || $userRole === 'Quản lý');
+                $post['CoTheChinhSua'] = ($post['MaTK'] === $userId);
+                $post['CoTheQuanLy'] = ($post['MaTK'] === $userId || $userRole === 'Quản lý');
             }
             
             echo json_encode([
@@ -222,13 +223,15 @@ try {
             $post['FileDinhKem'] = json_decode($post['FileDinhKem'], true) ?: [];
             $post['DaThichBD'] = (bool)$post['DaThichBD'];
             $post['DangTheoDoi'] = (bool)$post['DangTheoDoi'];
-            $post['CoTheChinhSua'] = ($post['MaTK'] === $userId || $userRole === 'Quản lý');
+            $post['CoTheChinhSua'] = ($post['MaTK'] === $userId);
+            $post['CoTheQuanLy'] = ($post['MaTK'] === $userId || $userRole === 'Quản lý');
             
             // Lấy danh sách bình luận
             $stmtComments = $pdo->prepare("
                 SELECT 
                     bl.*,
                     tk.VaiTro,
+                    tk.TenTK as TenTaiKhoan,
                     (SELECT COUNT(*) FROM CAMXUC WHERE LoaiDoiTuong='BinhLuan' AND MaDoiTuong=bl.MaBL AND MaTK=?) as DaThichBL
                 FROM BINHLUAN bl
                 JOIN TAIKHOAN tk ON bl.MaTK = tk.MaTK
@@ -255,6 +258,7 @@ try {
         case 'create_comment':
             $maBD = intval($_POST['maBD'] ?? 0);
             $noiDung = trim($_POST['noiDung'] ?? '');
+            $danhTinh = $_POST['danhTinh'] ?? 'Hữu danh';
             
             if (empty($noiDung)) {
                 echo json_encode(['success' => false, 'message' => 'Vui lòng nhập nội dung bình luận']);
@@ -285,6 +289,7 @@ try {
                 }
             }
             
+            $tenNguoiBinhLuan = ($danhTinh === 'Ẩn danh') ? 'Ẩn danh' : $userName;
             $stmt = $pdo->prepare("
                 INSERT INTO BINHLUAN (MaBD, MaTK, TenNguoiBinhLuan, NoiDung, FileDinhKem)
                 VALUES (?, ?, ?, ?, ?)
@@ -292,7 +297,7 @@ try {
             $stmt->execute([
                 $maBD,
                 $userId,
-                $userName,
+                $tenNguoiBinhLuan,
                 $noiDung,
                 json_encode($fileDinhKem)
             ]);
@@ -300,7 +305,7 @@ try {
             $maBL = $pdo->lastInsertId();
             
             // Tạo thông báo
-            createCommentNotifications($pdo, $maBD, $maBL, $userId, $userName, $noiDung);
+            createCommentNotifications($pdo, $maBD, $maBL, $userId, $tenNguoiBinhLuan, $noiDung);
             
             // Tự động theo dõi bài đăng khi bình luận
             $stmtTheoDoi = $pdo->prepare("
@@ -415,6 +420,51 @@ try {
                 'success' => true,
                 'trangThai' => $trangThaiMoi
             ]);
+            break;
+
+        // ============ CHỈNH SỬA BÀI ĐĂNG ============
+        case 'update_post':
+            $maBD = intval($_POST['maBD'] ?? 0);
+            $noiDung = trim($_POST['noiDung'] ?? '');
+            $danhTinh = $_POST['danhTinh'] ?? 'Hữu danh';
+            $phanLoai = $_POST['phanLoai'] ?? 'Diễn đàn nhân viên';
+            $trangThai = $_POST['trangThai'] ?? 'Hiển thị';
+
+            if (empty($noiDung)) {
+                echo json_encode(['success' => false, 'message' => 'Vui lòng nhập nội dung bài đăng']);
+                exit();
+            }
+
+            $stmtCheck = $pdo->prepare("SELECT MaTK FROM BAIDANG WHERE MaBD=?");
+            $stmtCheck->execute([$maBD]);
+            $post = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+            if (!$post || $post['MaTK'] !== $userId) {
+                echo json_encode(['success' => false, 'message' => 'Không có quyền']);
+                exit();
+            }
+
+            if ($phanLoai === 'Bảng tin công ty' && $userRole !== 'Quản lý') {
+                echo json_encode(['success' => false, 'message' => 'Chỉ Quản lý mới được đăng bài vào Bảng tin công ty']);
+                exit();
+            }
+
+            $tenNguoiDang = ($danhTinh === 'Ẩn danh') ? 'Ẩn danh' : $userName;
+            $stmtUpdate = $pdo->prepare("
+                UPDATE BAIDANG
+                SET NoiDung=?, DanhTinh=?, PhanLoai=?, TrangThai=?, TenNguoiDang=?
+                WHERE MaBD=?
+            ");
+            $stmtUpdate->execute([
+                $noiDung,
+                $danhTinh,
+                $phanLoai,
+                $trangThai,
+                $tenNguoiDang,
+                $maBD
+            ]);
+
+            echo json_encode(['success' => true, 'message' => 'Đã cập nhật bài đăng']);
             break;
             
         // ============ XÓA BÀI ĐĂNG ============
@@ -549,6 +599,84 @@ try {
                 'success' => true,
                 'notifications' => $notifications,
                 'unreadCount' => $unreadCount
+            ]);
+            break;
+
+        case 'get_activity_updates':
+            $stmtUnread = $pdo->prepare("
+                SELECT COUNT(*) as unread FROM THONGBAO WHERE MaTK=? AND DaDoc=0 AND LoaiThongBao != 'BaoCaoBaiDang'
+            ");
+            $stmtUnread->execute([$userId]);
+            $generalUnread = $stmtUnread->fetch(PDO::FETCH_ASSOC)['unread'];
+
+            $latestNotification = null;
+            $latestNotificationId = null;
+            $stmtLatest = $pdo->prepare("
+                SELECT * FROM THONGBAO
+                WHERE MaTK=? AND LoaiThongBao != 'BaoCaoBaiDang'
+                ORDER BY ThoiGian DESC, MaTB DESC
+                LIMIT 1
+            ");
+            $stmtLatest->execute([$userId]);
+            $latestNotification = $stmtLatest->fetch(PDO::FETCH_ASSOC) ?: null;
+            if ($latestNotification) {
+                $latestNotificationId = $latestNotification['MaTB'];
+            }
+
+            $reportUnread = 0;
+            $latestReportNotification = null;
+            $latestReportNotificationId = null;
+            if ($userRole === 'Quản lý') {
+                $stmtReportUnread = $pdo->prepare("
+                    SELECT COUNT(*) as unread FROM THONGBAO WHERE MaTK=? AND DaDoc=0 AND LoaiThongBao = 'BaoCaoBaiDang'
+                ");
+                $stmtReportUnread->execute([$userId]);
+                $reportUnread = $stmtReportUnread->fetch(PDO::FETCH_ASSOC)['unread'];
+
+                $stmtLatestReport = $pdo->prepare("
+                    SELECT * FROM THONGBAO
+                    WHERE MaTK=? AND LoaiThongBao = 'BaoCaoBaiDang'
+                    ORDER BY ThoiGian DESC, MaTB DESC
+                    LIMIT 1
+                ");
+                $stmtLatestReport->execute([$userId]);
+                $latestReportNotification = $stmtLatestReport->fetch(PDO::FETCH_ASSOC) ?: null;
+                if ($latestReportNotification) {
+                    $latestReportNotificationId = $latestReportNotification['MaTB'];
+                }
+            }
+
+            $latestPost = null;
+            $latestPostId = null;
+            if ($userRole === 'Quản lý') {
+                $stmtLatestPost = $pdo->prepare("
+                    SELECT MaBD, TenNguoiDang, NoiDung
+                    FROM BAIDANG
+                    WHERE TrangThai IN ('Hiển thị', 'Ẩn') AND MaTK != ?
+                    ORDER BY ThoiGianDang DESC, MaBD DESC
+                    LIMIT 1
+                ");
+                $stmtLatestPost->execute([$userId]);
+                $latestPost = $stmtLatestPost->fetch(PDO::FETCH_ASSOC) ?: null;
+                if ($latestPost) {
+                    $latestPostId = $latestPost['MaBD'];
+                    $noiDungRutGon = mb_substr($latestPost['NoiDung'], 0, 60);
+                    if (mb_strlen($latestPost['NoiDung']) > 60) {
+                        $noiDungRutGon .= '...';
+                    }
+                    $latestPost['NoiDungRutGon'] = $noiDungRutGon;
+                }
+            }
+
+            echo json_encode([
+                'success' => true,
+                'unreadCount' => intval($generalUnread) + intval($reportUnread),
+                'latestNotificationId' => $latestNotificationId,
+                'latestNotification' => $latestNotification,
+                'latestReportNotificationId' => $latestReportNotificationId,
+                'latestReportNotification' => $latestReportNotification,
+                'latestPostId' => $latestPostId,
+                'latestPost' => $latestPost
             ]);
             break;
 

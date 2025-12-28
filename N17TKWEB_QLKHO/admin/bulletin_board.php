@@ -478,6 +478,11 @@ $userInitials = getInitialsFromName($userName);
             color: var(--primary);
         }
 
+        .action-btn.like-btn.active,
+        .action-btn.like-btn.active .fa-heart {
+            color: #e11d48;
+        }
+
         .action-btn i {
             font-size: 18px;
         }
@@ -567,14 +572,28 @@ $userInitials = getInitialsFromName($userName);
         }
 
         .comment-action.liked {
-            color: var(--primary);
+            color: #e11d48;
             font-weight: 600;
+        }
+
+        .comment-action.liked .fa-heart {
+            color: #e11d48;
         }
 
         .comment-input-wrapper {
             display: flex;
             gap: 12px;
             margin-top: 15px;
+            align-items: center;
+        }
+
+        .comment-identity {
+            border: 1px solid #e0e0e0;
+            border-radius: 20px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--text);
+            background: white;
         }
 
         .comment-input {
@@ -875,6 +894,29 @@ $userInitials = getInitialsFromName($userName);
             font-weight: 700;
         }
 
+        .notification-toast {
+            position: absolute;
+            top: 0;
+            right: 60px;
+            min-width: 220px;
+            max-width: 320px;
+            background: #1f2937;
+            color: #fff;
+            padding: 12px 14px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            font-size: 13px;
+            opacity: 0;
+            transform: translateX(10px);
+            transition: all 0.25s ease;
+            pointer-events: none;
+        }
+
+        .notification-toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
         .notifications-dropdown {
             display: none;
             position: absolute;
@@ -1146,6 +1188,11 @@ $userInitials = getInitialsFromName($userName);
             color: #0369a1;
         }
 
+        .post-action-edit {
+            background: #e0f2fe;
+            color: #1d4ed8;
+        }
+
         .post-action-delete {
             background: #fee2e2;
             color: #b91c1c;
@@ -1394,6 +1441,7 @@ $userInitials = getInitialsFromName($userName);
                     <i class="fas fa-bell"></i>
                     <span class="bell-badge" id="notifBadge" style="display: none;">0</span>
                 </div>
+                <div class="notification-toast" id="notificationToast"></div>
                 <div class="notifications-dropdown" id="notificationsDropdown">
                     <div class="notif-header">
                         <span class="notif-title">Thông báo</span>
@@ -1527,11 +1575,66 @@ $userInitials = getInitialsFromName($userName);
                 </div>
             </div>
 
+            <!-- Modal chỉnh sửa bài -->
+            <div class="create-post-modal" id="editPostModal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Chỉnh sửa bài đăng</h2>
+                        <button class="modal-close" onclick="closeEditPostModal()">&times;</button>
+                    </div>
+                    <form id="editPostForm">
+                        <input type="hidden" id="editPostId" name="maBD" value="">
+                        <div class="form-group">
+                            <label>Nội dung bài đăng <span style="color: red;">*</span></label>
+                            <textarea class="post-textarea" name="noiDung" id="editPostContent"
+                                      placeholder="Cập nhật nội dung..." required></textarea>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Danh tính</label>
+                                <select name="danhTinh" id="editPostIdentity">
+                                    <option value="Hữu danh">Hữu danh</option>
+                                    <option value="Ẩn danh">Ẩn danh</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Phân loại</label>
+                                <select name="phanLoai" id="editPostCategory">
+                                    <?php if ($isManager): ?>
+                                    <option value="Bảng tin công ty">Bảng tin công ty</option>
+                                    <?php endif; ?>
+                                    <option value="Diễn đàn nhân viên">Diễn đàn nhân viên</option>
+                                    <option value="Góc hỏi đáp">Góc hỏi đáp</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Trạng thái</label>
+                                <select name="trangThai" id="editPostStatus">
+                                    <option value="Hiển thị">Hiển thị</option>
+                                    <option value="Ẩn">Ẩn</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button type="button" class="btn-cancel" onclick="closeEditPostModal()">Hủy</button>
+                            <button type="submit" class="btn-submit">Lưu thay đổi</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <!-- Post action modal -->
             <div class="post-action-modal" id="postActionModal">
                 <div class="post-action-content">
                     <h3>Tuỳ chọn bài đăng</h3>
                     <div class="post-action-buttons">
+                        <button class="post-action-edit" id="postActionEditBtn" onclick="openEditPostModal()">
+                            <i class="fas fa-pen"></i> Chỉnh sửa bài đăng
+                        </button>
                         <button class="post-action-toggle" id="postActionToggleBtn" onclick="handlePostActionToggle()"></button>
                         <button class="post-action-report" id="postActionReportBtn" onclick="openReportModal()">
                             <i class="fas fa-flag"></i> Báo cáo với quản trị viên
@@ -1599,8 +1702,13 @@ $userInitials = getInitialsFromName($userName);
         let activePostActionStatus = null;
         let activePostActionMode = 'standard';
         let activePostCanEdit = false;
+        let activePostCanManage = false;
         let activeReportNotificationId = null;
         let activeNotifItemMenu = null;
+        let lastNotificationId = null;
+        let lastReportNotificationId = null;
+        let lastPostId = null;
+        let activityInitialized = false;
         const isManager = <?php echo $isManager ? 'true' : 'false'; ?>;
         const currentUserId = <?php echo json_encode($userId); ?>;
         const currentUserName = <?php echo json_encode($userName); ?>;
@@ -1645,6 +1753,7 @@ $userInitials = getInitialsFromName($userName);
 
             // Form submit
             document.getElementById('createPostForm').addEventListener('submit', handleCreatePost);
+            document.getElementById('editPostForm').addEventListener('submit', handleEditPost);
 
             // Close modals on outside click
             document.getElementById('createPostModal').addEventListener('click', function(e) {
@@ -1671,11 +1780,17 @@ $userInitials = getInitialsFromName($userName);
                 }
             });
 
-        document.getElementById('reportModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeReportModal();
-            }
-        });
+            document.getElementById('reportModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeReportModal();
+                }
+            });
+
+            document.getElementById('editPostModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeEditPostModal();
+                }
+            });
 
 
             document.addEventListener('click', function(event) {
@@ -1726,6 +1841,35 @@ $userInitials = getInitialsFromName($userName);
             document.getElementById('createPostForm').reset();
             selectedFiles = [];
             document.getElementById('selectedFiles').innerHTML = '';
+        }
+
+        function openEditPostModal() {
+            if (!activePostActionId) return;
+            fetch(`bulletin_api.php?action=get_post_detail&maBD=${activePostActionId}`)
+                .then(response => response.json())
+                .then(result => {
+                    if (!result.success) {
+                        alert('Không thể tải thông tin bài đăng');
+                        return;
+                    }
+                    const post = result.post;
+                    document.getElementById('editPostId').value = post.MaBD;
+                    document.getElementById('editPostContent').value = post.NoiDung || '';
+                    document.getElementById('editPostIdentity').value = post.DanhTinh || 'Hữu danh';
+                    document.getElementById('editPostCategory').value = post.PhanLoai || 'Diễn đàn nhân viên';
+                    document.getElementById('editPostStatus').value = post.TrangThai || 'Hiển thị';
+                    document.getElementById('editPostModal').classList.add('show');
+                    document.body.style.overflow = 'hidden';
+                    closePostActionModal();
+                })
+                .catch(() => alert('Không thể tải thông tin bài đăng'));
+        }
+
+        function closeEditPostModal() {
+            document.getElementById('editPostModal').classList.remove('show');
+            document.body.style.overflow = '';
+            document.getElementById('editPostForm').reset();
+            document.getElementById('editPostId').value = '';
         }
 
         // ==================== FILE HANDLING ====================
@@ -1801,6 +1945,36 @@ $userInitials = getInitialsFromName($userName);
             } catch (error) {
                 console.error('Error:', error);
                 alert('Có lỗi xảy ra khi đăng bài');
+            }
+        }
+
+        async function handleEditPost(e) {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('action', 'update_post');
+            formData.append('maBD', document.getElementById('editPostId').value);
+            formData.append('noiDung', document.getElementById('editPostContent').value);
+            formData.append('danhTinh', document.getElementById('editPostIdentity').value);
+            formData.append('phanLoai', document.getElementById('editPostCategory').value);
+            formData.append('trangThai', document.getElementById('editPostStatus').value);
+
+            try {
+                const response = await fetch('bulletin_api.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('Đã cập nhật bài đăng');
+                    closeEditPostModal();
+                    closePostActionModal();
+                    loadPosts();
+                } else {
+                    alert('Lỗi: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Có lỗi xảy ra khi cập nhật bài đăng');
             }
         }
 
@@ -1912,7 +2086,7 @@ $userInitials = getInitialsFromName($userName);
                     `;
             const actionButtons = allowActions ? `
                     <div class="post-actions">
-                        <button class="action-btn ${post.DaThichBD ? 'active' : ''}" data-post-like-btn="${post.MaBD}" onclick="toggleReaction('BaiDang', ${post.MaBD})">
+                        <button class="action-btn like-btn ${post.DaThichBD ? 'active' : ''}" data-post-like-btn="${post.MaBD}" onclick="toggleReaction('BaiDang', ${post.MaBD})">
                             <i class="fas fa-heart"></i>
                             <span>Thích</span>
                         </button>
@@ -1949,7 +2123,7 @@ $userInitials = getInitialsFromName($userName);
                             ${isHidden ? '<span class="post-status-badge"><i class="fas fa-eye-slash"></i> Đang ẩn</span>' : ''}
                         </div>
                     </div>
-                    <button class="post-menu-btn" onclick="showPostMenu(${post.MaBD}, event, '${menuMode}', ${post.CoTheChinhSua}, ${reportNotificationId ? reportNotificationId : 'null'})">
+                    <button class="post-menu-btn" onclick="showPostMenu(${post.MaBD}, event, '${menuMode}', ${post.CoTheQuanLy}, ${post.CoTheChinhSua}, ${reportNotificationId ? reportNotificationId : 'null'})">
                         <i class="fas fa-ellipsis-v"></i>
                     </button>
                 </div>
@@ -1987,8 +2161,12 @@ $userInitials = getInitialsFromName($userName);
                     <div class="comments-list"></div>
                     <div class="comment-input-wrapper">
                         <input type="text" class="comment-input" placeholder="Viết bình luận..." 
-                               onkeypress="if(event.key==='Enter') submitComment(${post.MaBD}, this.value, this)">
-                        <button class="comment-submit-btn" onclick="submitComment(${post.MaBD}, this.previousElementSibling.value, this.previousElementSibling)">
+                               onkeypress="if(event.key==='Enter') submitComment(${post.MaBD}, this.value, this, this.parentElement.querySelector('.comment-identity').value)">
+                        <select class="comment-identity" aria-label="Danh tính bình luận">
+                            <option value="Hữu danh">Hữu danh</option>
+                            <option value="Ẩn danh">Ẩn danh</option>
+                        </select>
+                        <button class="comment-submit-btn" onclick="submitComment(${post.MaBD}, this.previousElementSibling.previousElementSibling.value, this.previousElementSibling.previousElementSibling, this.previousElementSibling.value)">
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
@@ -2061,7 +2239,26 @@ $userInitials = getInitialsFromName($userName);
             
             const initials = getInitialsFromName(comment.TenNguoiBinhLuan);
             const timeAgo = getTimeAgo(comment.ThoiGianBinhLuan);
-            const managerBadge = comment.VaiTro === 'Quản lý' ? '<span class="role-badge">Admin</span>' : '';
+            const showManagerBadge = comment.VaiTro === 'Quản lý' && comment.TenNguoiBinhLuan !== 'Ẩn danh';
+            const managerBadge = showManagerBadge ? '<span class="role-badge">Admin</span>' : '';
+            const commentDisplayName = comment.TenNguoiBinhLuan || '';
+            const commentAuthorFullName = comment.TenTaiKhoan || comment.TenNguoiBinhLuan || '';
+            const commentAuthorInitials = getInitialsFromName(commentAuthorFullName);
+            const commentAuthorIdLabel = comment.MaTK ? escapeHtml(comment.MaTK) : '-';
+            const commentRoleLabel = comment.VaiTro ? escapeHtml(comment.VaiTro) : '-';
+            const canShowCommentTooltip = isManager && comment.MaTK;
+            const commentTooltip = canShowCommentTooltip ? `
+                        <div class="author-tooltip">
+                            <div class="author-tooltip-header">
+                                <div class="author-tooltip-avatar">${commentAuthorInitials}</div>
+                                <div class="author-tooltip-info">
+                                    <div class="author-tooltip-name">${escapeHtml(commentAuthorFullName)}</div>
+                                    <div>M&#227; nh&#226;n vi&#234;n: ${commentAuthorIdLabel}</div>
+                                    <div>Vai tr&#242;: ${commentRoleLabel}</div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : '';
             
             const originalContent = comment.NoiDung || '';
             const fullContent = escapeHtml(originalContent);
@@ -2078,11 +2275,17 @@ $userInitials = getInitialsFromName($userName);
                 <div class="comment-avatar">${initials}</div>
                 <div class="comment-content">
                     <div class="comment-bubble">
-                        <div class="comment-author">${escapeHtml(comment.TenNguoiBinhLuan)} ${managerBadge}</div>
+                        <div class="comment-author">
+                            <span class="author-hover">
+                                <span class="author-display">${escapeHtml(commentDisplayName)}</span>
+                                ${managerBadge}
+                                ${commentTooltip}
+                            </span>
+                        </div>
                         ${commentTextHtml}
                     </div>
                     <div class="comment-actions">
-                        <span class="comment-action ${comment.DaThichBL ? 'liked' : ''}" data-comment-like-btn="${comment.MaBL}" onclick="toggleReaction('BinhLuan', ${comment.MaBL})">
+                        <span class="comment-action comment-like-btn ${comment.DaThichBL ? 'liked' : ''}" data-comment-like-btn="${comment.MaBL}" onclick="toggleReaction('BinhLuan', ${comment.MaBL})">
                             <i class="fas fa-heart"></i> <span data-comment-like-count="${comment.MaBL}">${comment.LuotCamXuc > 0 ? comment.LuotCamXuc : 'Thích'}</span>
                         </span>
                         <span class="comment-time">${timeAgo}</span>
@@ -2098,7 +2301,7 @@ $userInitials = getInitialsFromName($userName);
             return item;
         }
 
-        async function submitComment(maBD, noiDung, inputElement) {
+        async function submitComment(maBD, noiDung, inputElement, danhTinh = 'Hữu danh') {
             if (!noiDung.trim()) {
                 alert('Vui lòng nhập nội dung bình luận');
                 return;
@@ -2108,6 +2311,7 @@ $userInitials = getInitialsFromName($userName);
             formData.append('action', 'create_comment');
             formData.append('maBD', maBD);
             formData.append('noiDung', noiDung);
+            formData.append('danhTinh', danhTinh);
             
             try {
                 const response = await fetch('bulletin_api.php', {
@@ -2203,13 +2407,14 @@ $userInitials = getInitialsFromName($userName);
         }
 
         // ==================== POST MENU ====================
-        function showPostMenu(maBD, event, mode = 'standard', canEdit = false, reportNotificationId = null) {
+        function showPostMenu(maBD, event, mode = 'standard', canManage = false, canEdit = false, reportNotificationId = null) {
             event.stopPropagation();
             const card = document.querySelector(`[data-post-id="${maBD}"]`);
             activePostActionId = maBD;
             activePostActionStatus = card ? card.dataset.status : 'Hiển thị';
             activePostActionMode = mode;
             activePostCanEdit = canEdit;
+            activePostCanManage = canManage;
             if (mode === 'report' && reportNotificationId) {
                 activeReportNotificationId = reportNotificationId;
             }
@@ -2218,8 +2423,9 @@ $userInitials = getInitialsFromName($userName);
             const reportBtn = document.getElementById('postActionReportBtn');
             const deleteReportBtn = document.getElementById('postActionDeleteReportBtn');
             const deleteBtn = document.querySelector('.post-action-delete:not(#postActionDeleteReportBtn)');
+            const editBtn = document.getElementById('postActionEditBtn');
 
-            if (activePostCanEdit && activePostActionMode === 'standard') {
+            if (activePostCanManage && activePostActionMode === 'standard') {
                 toggleBtn.style.display = 'inline-flex';
                 deleteBtn.style.display = 'inline-flex';
                 toggleBtn.innerHTML = activePostActionStatus === 'Ẩn'
@@ -2231,6 +2437,10 @@ $userInitials = getInitialsFromName($userName);
             } else {
                 toggleBtn.style.display = 'none';
                 deleteBtn.style.display = 'none';
+            }
+
+            if (editBtn) {
+                editBtn.style.display = activePostCanEdit && activePostActionMode === 'standard' ? 'inline-flex' : 'none';
             }
 
             if (activePostActionMode === 'report') {
@@ -2254,6 +2464,7 @@ $userInitials = getInitialsFromName($userName);
             activePostActionStatus = null;
             activePostActionMode = 'standard';
             activePostCanEdit = false;
+            activePostCanManage = false;
         }
 
         async function handlePostActionToggle() {
@@ -2450,12 +2661,7 @@ $userInitials = getInitialsFromName($userName);
 
                     const badge = document.getElementById('notifBadge');
                     const totalUnread = Number(result.unreadCount || 0) + Number(reportResult ? reportResult.unreadCount : 0);
-                    if (totalUnread > 0) {
-                        badge.style.display = 'flex';
-                        badge.textContent = totalUnread;
-                    } else {
-                        badge.style.display = 'none';
-                    }
+                    setNotificationBadge(totalUnread);
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -2477,9 +2683,28 @@ $userInitials = getInitialsFromName($userName);
             }
         }
 
+        function renderNotificationTextPlain(notif) {
+            switch (notif.LoaiThongBao) {
+                case 'BinhLuanBaiCuaBan':
+                    return `${notif.TenNguoiTacDong || ''} đã bình luận bài viết của bạn: “${notif.NoiDungRutGon || ''}”`;
+                case 'BinhLuanBaiTheoDoi':
+                    return `${notif.TenNguoiTacDong || ''} đã bình luận bài bạn theo dõi: “${notif.NoiDungRutGon || ''}”`;
+                case 'BaiHot':
+                    return `Hot: “${notif.NoiDungRutGon || ''}”`;
+                case 'BaiDangCongTy':
+                    return `Thông báo mới từ công ty: “${notif.NoiDungRutGon || ''}”`;
+                default:
+                    return notif.NoiDungRutGon || 'Bạn có thông báo mới';
+            }
+        }
+
         function renderReportNotificationText(notif) {
             // Include a three-dot action button for per-report actions
             return `<span class="report-notif-text">B&#225;o c&#225;o t&#7915; <strong>${escapeHtml(notif.TenNguoiTacDong || '')}</strong>: ${escapeHtml(notif.NoiDungRutGon || '')}</span><button type="button" class="notif-more-btn" data-report-id="${notif.MaTB}" aria-label="T&#249;y ch&#7885;n">&#8942;</button>`;
+        }
+
+        function renderReportNotificationTextPlain(notif) {
+            return `Báo cáo mới từ ${notif.TenNguoiTacDong || ''}: ${notif.NoiDungRutGon || ''}`;
         }
 
         async function handleNotificationClick(notif) {
@@ -2589,7 +2814,69 @@ $userInitials = getInitialsFromName($userName);
 
         function startNotificationPolling() {
             if (notificationInterval) clearInterval(notificationInterval);
-            notificationInterval = setInterval(loadNotifications, 30000);
+            pollActivityUpdates(true);
+            notificationInterval = setInterval(() => pollActivityUpdates(), 30000);
+        }
+
+        async function pollActivityUpdates(initial = false) {
+            try {
+                const response = await fetch('bulletin_api.php?action=get_activity_updates');
+                const result = await response.json();
+                if (!result.success) return;
+
+                setNotificationBadge(Number(result.unreadCount || 0));
+
+                if (!activityInitialized) {
+                    lastNotificationId = result.latestNotificationId;
+                    lastReportNotificationId = result.latestReportNotificationId;
+                    lastPostId = result.latestPostId;
+                    activityInitialized = true;
+                    return;
+                }
+
+                if (initial) {
+                    lastNotificationId = result.latestNotificationId;
+                    lastReportNotificationId = result.latestReportNotificationId;
+                    lastPostId = result.latestPostId;
+                    return;
+                }
+
+                const messages = [];
+
+                if (result.latestNotificationId && (!lastNotificationId || result.latestNotificationId > lastNotificationId) && result.latestNotification) {
+                    messages.push(renderNotificationTextPlain(result.latestNotification));
+                }
+
+                if (isManager && result.latestReportNotificationId && (!lastReportNotificationId || result.latestReportNotificationId > lastReportNotificationId) && result.latestReportNotification) {
+                    messages.push(renderReportNotificationTextPlain(result.latestReportNotification));
+                }
+
+                if (isManager && result.latestPostId && (!lastPostId || result.latestPostId > lastPostId) && result.latestPost) {
+                    const postSnippet = result.latestPost.NoiDungRutGon || '';
+                    const authorName = result.latestPost.TenNguoiDang || 'Nhân viên';
+                    messages.push(`Bài đăng mới từ ${authorName}: “${postSnippet}”`);
+                }
+
+                if (messages.length > 0) {
+                    showNotificationToast(messages[0]);
+                }
+
+                lastNotificationId = result.latestNotificationId;
+                lastReportNotificationId = result.latestReportNotificationId;
+                lastPostId = result.latestPostId;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function showNotificationToast(message) {
+            const toast = document.getElementById('notificationToast');
+            if (!toast) return;
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 4000);
         }
 
         // ==================== PAGINATION ====================
@@ -2685,6 +2972,19 @@ $userInitials = getInitialsFromName($userName);
                     label.textContent = isFollowing ? 'Đang theo dõi' : 'Theo dõi';
                 }
             });
+        }
+
+        function setNotificationBadge(count) {
+            const badge = document.getElementById('notifBadge');
+            if (!badge) return;
+            const total = Number(count || 0);
+            if (total > 0) {
+                badge.style.display = 'flex';
+                badge.textContent = total;
+            } else {
+                badge.style.display = 'none';
+                badge.textContent = '0';
+            }
         }
 
         function adjustNotificationBadge(delta) {
