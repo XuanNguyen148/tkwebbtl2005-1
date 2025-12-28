@@ -67,6 +67,32 @@ $userInitials = getInitialsFromName($userName);
             padding: 20px;
         }
 
+        .bulletin-page .sidebar {
+            width: 72px;
+        }
+
+        .bulletin-page .main-content {
+            margin-left: 72px;
+        }
+
+        .bulletin-page .nav-link,
+        .bulletin-page .logout-btn {
+            justify-content: center;
+        }
+
+        .bulletin-page .nav-link i {
+            margin-right: 0;
+            font-size: 18px;
+        }
+
+        .bulletin-page .logout-btn i {
+            margin-right: 0;
+        }
+
+        .bulletin-page .nav-label {
+            display: none;
+        }
+
         /* Header với nút đăng bài và tabs */
         .bulletin-header {
             display: flex;
@@ -1413,7 +1439,7 @@ $userInitials = getInitialsFromName($userName);
         }
     </style>
 </head>
-<body>
+<body class="bulletin-page">
     <!-- Header -->
     <header class="header">
         <button class="mobile-menu-toggle" onclick="toggleSidebar(); return false;" aria-label="Toggle menu">
