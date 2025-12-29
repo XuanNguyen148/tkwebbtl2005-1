@@ -431,11 +431,27 @@ CREATE TABLE `thongbao` (
   `MaTK` char(7) NOT NULL COMMENT 'Người nhận thông báo',
   `LoaiThongBao` enum('BinhLuanBaiTheoDoi','BinhLuanBaiCuaBan','BaiHot','BaiDangCongTy','BaoCaoBaiDang') NOT NULL,
   `MaBD` int(11) NOT NULL,
+  `MaBC` int(11) DEFAULT NULL COMMENT 'Mã báo cáo bài đăng',
   `MaBL` int(11) DEFAULT NULL COMMENT 'Nếu là thông báo bình luận',
   `NguoiTacDong` char(7) DEFAULT NULL COMMENT 'Người gây ra thông báo (bình luận, ...)',
   `TenNguoiTacDong` varchar(100) DEFAULT NULL,
   `NoiDungRutGon` varchar(255) DEFAULT NULL,
   `DaDoc` tinyint(1) DEFAULT 0,
+  `ThoiGian` datetime DEFAULT current_timestamp()
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `baocao_baidang`
+--
+
+CREATE TABLE `baocao_baidang` (
+  `MaBC` int(11) NOT NULL,
+  `MaBD` int(11) NOT NULL,
+  `MaTK` char(7) NOT NULL COMMENT 'Người gửi báo cáo',
+  `LyDo` text NOT NULL,
+  `TrangThai` enum('Mới','Đã xử lý') DEFAULT 'Mới',
   `ThoiGian` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -469,6 +485,14 @@ ALTER TABLE `camxuc`
   ADD PRIMARY KEY (`MaCX`),
   ADD UNIQUE KEY `unique_camxuc` (`MaTK`,`LoaiDoiTuong`,`MaDoiTuong`),
   ADD KEY `idx_doituong` (`LoaiDoiTuong`,`MaDoiTuong`);
+
+--
+-- Chỉ mục cho bảng `baocao_baidang`
+--
+ALTER TABLE `baocao_baidang`
+  ADD PRIMARY KEY (`MaBC`),
+  ADD KEY `MaBD` (`MaBD`),
+  ADD KEY `MaTK` (`MaTK`);
 
 --
 -- Chỉ mục cho bảng `chitietphieunhap`
@@ -542,6 +566,7 @@ ALTER TABLE `theodoi_baidang`
 ALTER TABLE `thongbao`
   ADD PRIMARY KEY (`MaTB`),
   ADD KEY `MaBD` (`MaBD`),
+  ADD KEY `MaBC` (`MaBC`),
   ADD KEY `MaBL` (`MaBL`),
   ADD KEY `idx_matk_dadoc` (`MaTK`,`DaDoc`),
   ADD KEY `idx_thoigian` (`ThoiGian`);
@@ -567,6 +592,12 @@ ALTER TABLE `binhluan`
 --
 ALTER TABLE `camxuc`
   MODIFY `MaCX` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT cho bảng `baocao_baidang`
+--
+ALTER TABLE `baocao_baidang`
+  MODIFY `MaBC` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT cho bảng `lich_su_hoat_dong`
@@ -608,6 +639,13 @@ ALTER TABLE `binhluan`
 --
 ALTER TABLE `camxuc`
   ADD CONSTRAINT `camxuc_ibfk_1` FOREIGN KEY (`MaTK`) REFERENCES `taikhoan` (`MaTK`) ON DELETE CASCADE;
+
+--
+-- Các ràng buộc cho bảng `baocao_baidang`
+--
+ALTER TABLE `baocao_baidang`
+  ADD CONSTRAINT `baocao_baidang_ibfk_1` FOREIGN KEY (`MaBD`) REFERENCES `baidang` (`MaBD`) ON DELETE CASCADE,
+  ADD CONSTRAINT `baocao_baidang_ibfk_2` FOREIGN KEY (`MaTK`) REFERENCES `taikhoan` (`MaTK`) ON DELETE CASCADE;
 
 --
 -- Các ràng buộc cho bảng `chitietphieunhap`
@@ -655,7 +693,8 @@ ALTER TABLE `theodoi_baidang`
 ALTER TABLE `thongbao`
   ADD CONSTRAINT `thongbao_ibfk_1` FOREIGN KEY (`MaTK`) REFERENCES `taikhoan` (`MaTK`) ON DELETE CASCADE,
   ADD CONSTRAINT `thongbao_ibfk_2` FOREIGN KEY (`MaBD`) REFERENCES `baidang` (`MaBD`) ON DELETE CASCADE,
-  ADD CONSTRAINT `thongbao_ibfk_3` FOREIGN KEY (`MaBL`) REFERENCES `binhluan` (`MaBL`) ON DELETE CASCADE;
+  ADD CONSTRAINT `thongbao_ibfk_3` FOREIGN KEY (`MaBL`) REFERENCES `binhluan` (`MaBL`) ON DELETE CASCADE,
+  ADD CONSTRAINT `thongbao_ibfk_4` FOREIGN KEY (`MaBC`) REFERENCES `baocao_baidang` (`MaBC`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
