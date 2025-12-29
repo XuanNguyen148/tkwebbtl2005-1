@@ -37,7 +37,7 @@ $menu_items[] = ['href' => 'bulletin_board.php', 'icon' => 'fa-bullhorn', 'label
             <li class="nav-item">
                 <a href="<?php echo $item['href']; ?>" 
                    class="nav-link <?php echo ($current_page === $item['href']) ? 'active' : ''; ?>">
-                    <i class="fas <?php echo $item['icon']; ?>"></i><?php echo $item['label']; ?>
+                    <i class="fas <?php echo $item['icon']; ?>"></i><span class="nav-label"><?php echo $item['label']; ?></span>
                 </a>
             </li>
         <?php endforeach; ?>
@@ -46,7 +46,7 @@ $menu_items[] = ['href' => 'bulletin_board.php', 'icon' => 'fa-bullhorn', 'label
     <li class="divider"></li>
     <div class="logout">
         <a href="../logout.php" class="logout-btn">
-            <i class="fas fa-sign-out-alt"></i> Đăng Xuất
+            <i class="fas fa-sign-out-alt"></i> <span class="nav-label">Đăng Xuất</span>
         </a>
     </div>
 </aside>
